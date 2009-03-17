@@ -1,0 +1,4 @@
+*.pyc
+build/
+dist/
+github_notifier.egg-info/

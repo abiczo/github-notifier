@@ -24,6 +24,13 @@ Now you can run github-notifier like this:
 
     github-notifier
 
+Screenshot
+----------
+
+Screenshot using [notify-osd][notify-osd]:
+
+![Screenshot](http://cloud.github.com/downloads/abiczo/github-notifier/github-notifier.png)
+
 TODO
 ----
 
@@ -31,3 +38,4 @@ TODO
 * Display systray icon
 
 [github-growler]: http://github.com/miyagawa/github-growler
+[notify-osd]: https://wiki.ubuntu.com/NotifyOSD

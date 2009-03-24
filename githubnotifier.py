@@ -51,8 +51,12 @@ def get_github_user_info(username):
 
     if not os.path.exists(user['avatar_path']):
         # Fetch the user's gravatar
-        hexdig = md5.new(obj['user']['email'].lower()).hexdigest()
-        gravatar_url = 'http://www.gravatar.com/avatar/%s.jpg?s=48' % hexdig
+        if 'email' in user:
+            hexdig = md5.new(user['email'].lower()).hexdigest()
+            gravatar_url = 'http://www.gravatar.com/avatar/%s.jpg?s=48' % hexdig
+        else:
+            gravatar_url = 'http://www.gravatar.com/avatar/?s=48'
+
         avatar_data = urllib2.urlopen(gravatar_url).read()
 
         # Cache the image

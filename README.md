@@ -30,6 +30,8 @@ Now you can run github-notifier like this:
 
     github-notifier
 
+Use `--help` for a list of available command line options.
+
 ### Packages
 
 An Arch Linux package is available [here][arch-package].
@@ -46,10 +48,14 @@ TODO
 
 * Make the update interval and the number of notifications to be displayed
   configurable
-* Display systray icon
 * Expire the user info and avatar caches after some time
 * Notify-osd has problems when the notification message contains
   an '&' character
+
+Notes
+-----
+
+The Octocat logo is taken from <http://github.com/mojombo/github-media>.
 
 [github-growler]: http://github.com/miyagawa/github-growler
 [arch-package]: http://aur.archlinux.org/packages.php?ID=25385

@@ -2,22 +2,29 @@ import os
 import sys
 import time
 import urllib2
+import Queue
+import threading
 import md5
 import optparse
 import logging
 import simplejson as json
 import feedparser
 
+import webbrowser
 import pygtk
 pygtk.require('2.0')
 import gobject
 import gtk
 import pynotify
 
+__version__ = '0.1'
+
 INTERVAL = 300 # feed checking interval (seconds)
 MAX = 3 # max number of notifications to be displayed
 
 CACHE_DIR = os.path.join(os.getenv('HOME'), '.githubnotifier', 'cache')
+
+notification_queue = Queue.Queue()
 
 def get_github_config():
     fp = os.popen('git config --get github.user')
@@ -68,47 +75,115 @@ def get_github_user_info(username):
 
     return user
 
-seen = {}
-def process_feed(feed_url):
-    log = logging.getLogger('github-notifier')
-    log.info('Fetching feed %s' % feed_url)
 
-    feed = feedparser.parse(feed_url)
+class GtkGui(object):
+    def __init__(self):
+        icon_path = os.path.join(os.path.dirname(__file__), 'octocat.png')
+        self.systray_icon = gtk.status_icon_new_from_file(
+            os.path.abspath(icon_path))
 
-    notifications = []
-    for entry in feed.entries:
-        if entry['id'] not in seen:
-            notifications.append(entry)
-            seen[entry['id']] = 1
+        self.menu = gtk.Menu()
 
-    return notifications
+        menu_about = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
+        menu_about.connect('activate', self.show_about)
+        menu_about.show()
+        self.menu.append(menu_about)
 
-def update_feeds(feeds):
-    notifications = []
-    for feed_url in feeds:
-        notifications.extend(process_feed(feed_url))
+        menu_quit = gtk.ImageMenuItem(gtk.STOCK_QUIT)
+        menu_quit.connect('activate', gtk.main_quit)
+        menu_quit.show()
+        self.menu.append(menu_quit)
 
-    notifications.sort(key=lambda e: e['updated'])
-    notifications = notifications[-MAX:]
+        self.systray_icon.connect('popup_menu', self.show_menu)
 
-    users = {}
-    for item in notifications:
-        user = get_github_user_info(item['author'])
-        users[item['author']] = user
+    def show_menu(self, icon, button, time):
+        self.menu.popup(None, None, gtk.status_icon_position_menu, button,
+                        time, icon)
 
-    for item in notifications:
-        user = users[item['author']]
-        # default to login name if the user's name is not set
-        name = user.get('name', user['login'])
-        n = pynotify.Notification(name,
-                                  item['title'],
-                                  user['avatar_path'])
-        n.show()
+    def show_about(self, item):
+        dlg = gtk.AboutDialog()
+        dlg.set_name('GitHub Notifier')
+        dlg.set_version(__version__)
+        dlg.set_authors(['Andras Biczo <abiczo@gmail.com>'])
+        dlg.set_copyright('Copyright %s 2009 Andras Biczo' % unichr(169).encode('utf-8'))
+        gtk.about_dialog_set_url_hook(lambda widget, link: webbrowser.open(link))
+        dlg.set_website('http://github.com/abiczo/github-notifier')
+        dlg.set_website_label('Homepage')
+        dlg.run()
+        dlg.destroy()
+
+
+class GithubFeedUpdatherThread(threading.Thread):
+    def __init__(self, user, token, interval):
+        threading.Thread.__init__(self)
+
+        self.feeds = [
+            'http://github.com/%s.private.atom?token=%s' % (user, token),
+            'http://github.com/%s.private.actor.atom?token=%s' % (user, token),
+        ]
+        self.interval = interval
+        self._seen = {}
+
+    def run(self):
+        while True:
+            self.update_feeds(self.feeds)
+            time.sleep(self.interval)
+
+    def process_feed(self, feed_url):
+        log = logging.getLogger('github-notifier')
+        log.info('Fetching feed %s' % feed_url)
+        feed = feedparser.parse(feed_url)
+
+        notifications = []
+        for entry in feed.entries:
+            if not entry['id'] in self._seen:
+                notifications.append(entry)
+                self._seen[entry['id']] = 1
+
+        return notifications
+
+    def update_feeds(self, feeds):
+        notifications = []
+        for feed_url in feeds:
+            notifications.extend(self.process_feed(feed_url))
+
+        notifications.sort(key=lambda e: e['updated'])
+        notifications = notifications[-MAX:]
+
+        users = {}
+        l = []
+        for item in notifications:
+            if not item['author'] in users:
+                users[item['author']] = get_github_user_info(item['author'])
+
+            user = users[item['author']]
+            n = {'title': user.get('name', user['login']),
+                 'message': item['title'],
+                 'icon': user['avatar_path']}
+            l.append(n)
+
+        notification_queue.put(l)
+
+
+def display_notifications():
+    while True:
+        try:
+            items = notification_queue.get_nowait()
+            for i in items:
+                n = pynotify.Notification(i['title'], i['message'], i['icon'])
+                n.show()
+
+            notification_queue.task_done()
+        except Queue.Empty:
+            break
 
     return True
 
 def main():
     parser = optparse.OptionParser()
+    parser.add_option('--no-systray-icon', dest='systray_icon',
+                      action='store_false', default=True,
+                      help='don\'t show the systray icon')
     parser.add_option('-v', '--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='enable verbose logging')
@@ -124,23 +199,33 @@ def main():
     if not os.path.isdir(CACHE_DIR):
         os.makedirs(CACHE_DIR)
 
+    if not pynotify.init('github-notifier'):
+        print >>sys.stderr, 'Error: couldn\'t initialize pynotify.'
+        sys.exit(1)
+
     (user, token) = get_github_config()
     if not user or not token:
         print >>sys.stderr, 'Error: couldn\'t get github config.'
         sys.exit(1)
 
-    github_feeds = (
-        'http://github.com/%s.private.atom?token=%s' % (user, token),
-        'http://github.com/%s.private.actor.atom?token=%s' % (user, token),
-    )
+    if options.systray_icon:
+        gtk.gdk.threads_init()
 
-    if not pynotify.init('github-notifier'):
-        print >>sys.stderr, 'Error: couldn\'t initialize pynotify.'
-        sys.exit(1)
+    # Start a new thread to check for feed updates
+    upd = GithubFeedUpdatherThread(user, token, INTERVAL)
+    upd.setDaemon(True)
+    upd.start()
 
-    while True:
-        update_feeds(github_feeds)
-        time.sleep(INTERVAL)
+    DISPLAY_INTERVAL = 1 # seconds
+    if options.systray_icon:
+        gui = GtkGui()
+        gobject.timeout_add(DISPLAY_INTERVAL * 1000, display_notifications)
+        gtk.main()
+    else:
+        while True:
+            display_notifications()
+            time.sleep(DISPLAY_INTERVAL)
+
 
 if __name__ == '__main__':
     main()

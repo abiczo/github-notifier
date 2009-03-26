@@ -94,7 +94,9 @@ def update_feeds(feeds):
 
     for item in notifications:
         user = users[item['author']]
-        n = pynotify.Notification(user['name'],
+        # default to login name if the user's name is not set
+        name = user.get('name', user['login'])
+        n = pynotify.Notification(name,
                                   item['title'],
                                   user['avatar_path'])
         n.show()

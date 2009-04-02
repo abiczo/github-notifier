@@ -14,6 +14,10 @@ from your distribution. On Ubuntu you can do this using the following command:
 
     apt-get install python-gtk2
 
+Then install the required dependencies:
+
+    easy_install feedparser simplejson
+
 Then clone the repository and install the module:
 
     git clone git://github.com/abiczo/github-notifier.git

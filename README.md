@@ -9,6 +9,8 @@ for new items.
 Install
 -------
 
+### From source
+
 As PyGTK can't be installed using setuptools you'll have to install PyGTK
 from your distribution. On Ubuntu you can do this using the following command:
 
@@ -28,6 +30,10 @@ Now you can run github-notifier like this:
 
     github-notifier
 
+### Packages
+
+An Arch Linux package is available [here][arch-package].
+
 Screenshot
 ----------
 
@@ -42,4 +48,5 @@ TODO
 * Display systray icon
 
 [github-growler]: http://github.com/miyagawa/github-growler
+[arch-package]: http://aur.archlinux.org/packages.php?ID=25385
 [notify-osd]: https://wiki.ubuntu.com/NotifyOSD

@@ -84,8 +84,8 @@ def update_feeds(feeds):
     for feed_url in feeds:
         notifications.extend(process_feed(feed_url))
 
-    notifications.sort(key=lambda e: e['updated'], reverse=True)
-    notifications = notifications[:MAX]
+    notifications.sort(key=lambda e: e['updated'])
+    notifications = notifications[-MAX:]
 
     users = {}
     for item in notifications:

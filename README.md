@@ -44,8 +44,12 @@ Screenshot using [notify-osd][notify-osd]:
 TODO
 ----
 
-* Make the update interval configurable
+* Make the update interval and the number of notifications to be displayed
+  configurable
 * Display systray icon
+* Expire the user info and avatar caches after some time
+* Notify-osd has problems when the notification message contains
+  an '&' character
 
 [github-growler]: http://github.com/miyagawa/github-growler
 [arch-package]: http://aur.archlinux.org/packages.php?ID=25385

@@ -3,6 +3,8 @@ import sys
 import time
 import urllib2
 import md5
+import optparse
+import logging
 import simplejson as json
 import feedparser
 
@@ -68,7 +70,9 @@ def get_github_user_info(username):
 
 seen = {}
 def process_feed(feed_url):
-    print 'Fetching feed %s' % feed_url
+    log = logging.getLogger('github-notifier')
+    log.info('Fetching feed %s' % feed_url)
+
     feed = feedparser.parse(feed_url)
 
     notifications = []
@@ -104,6 +108,19 @@ def update_feeds(feeds):
     return True
 
 def main():
+    parser = optparse.OptionParser()
+    parser.add_option('-v', '--verbose',
+                      action='store_true', dest='verbose', default=False,
+                      help='enable verbose logging')
+    (options, args) = parser.parse_args()
+
+    log = logging.getLogger('github-notifier')
+    log.addHandler(logging.StreamHandler())
+    if options.verbose:
+        log.setLevel(logging.INFO)
+    else:
+        log.setLevel(logging.ERROR)
+
     if not os.path.isdir(CACHE_DIR):
         os.makedirs(CACHE_DIR)
 

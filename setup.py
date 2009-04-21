@@ -11,7 +11,9 @@ setup(name='github-notifier',
       py_modules=['githubnotifier'],
       install_requires=['simplejson', 'feedparser'],
       zip_safe=False,
-      data_files=[('', ['octocat.png'])],
+      packages=[''],
+      package_dir={'': '.'},
+      package_data={'': ['octocat.png']},
       entry_points="""
         [console_scripts]
         github-notifier = githubnotifier:main

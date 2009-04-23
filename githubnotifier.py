@@ -19,9 +19,6 @@ import pynotify
 
 __version__ = '0.1'
 
-INTERVAL = 300 # feed checking interval (seconds)
-MAX = 3 # max number of notifications to be displayed
-
 CACHE_DIR = os.path.join(os.getenv('HOME'), '.githubnotifier', 'cache')
 
 notification_queue = Queue.Queue()
@@ -114,7 +111,7 @@ class GtkGui(object):
 
 
 class GithubFeedUpdatherThread(threading.Thread):
-    def __init__(self, user, token, interval):
+    def __init__(self, user, token, interval, max_items):
         threading.Thread.__init__(self)
 
         self.feeds = [
@@ -122,6 +119,7 @@ class GithubFeedUpdatherThread(threading.Thread):
             'http://github.com/%s.private.actor.atom?token=%s' % (user, token),
         ]
         self.interval = interval
+        self.max_items = max_items
         self._seen = {}
 
     def run(self):
@@ -148,7 +146,7 @@ class GithubFeedUpdatherThread(threading.Thread):
             notifications.extend(self.process_feed(feed_url))
 
         notifications.sort(key=lambda e: e['updated'])
-        notifications = notifications[-MAX:]
+        notifications = notifications[-self.max_items:]
 
         users = {}
         l = []
@@ -186,6 +184,12 @@ def main():
     parser.add_option('--no-systray-icon', dest='systray_icon',
                       action='store_false', default=True,
                       help='don\'t show the systray icon')
+    parser.add_option('-i', '--update-interval',
+                      action='store', type='int', dest='interval', default=300,
+                      help='set the feed update interval (in seconds)')
+    parser.add_option('-m', '--max-items',
+                      action='store', type='int', dest='max_items', default=3,
+                      help='maximum number of items to be displayed per update')
     parser.add_option('-t', '--display-timeout',
                       action='store', type='int', dest='timeout',
                       help='set the notification display timeout (in seconds)')
@@ -217,7 +221,8 @@ def main():
         gtk.gdk.threads_init()
 
     # Start a new thread to check for feed updates
-    upd = GithubFeedUpdatherThread(user, token, INTERVAL)
+    upd = GithubFeedUpdatherThread(user, token, options.interval,
+                                   options.max_items)
     upd.setDaemon(True)
     upd.start()
 

@@ -46,8 +46,6 @@ Screenshot using [notify-osd][notify-osd]:
 TODO
 ----
 
-* Make the update interval and the number of notifications to be displayed
-  configurable
 * Expire the user info and avatar caches after some time
 * Notify-osd has problems when the notification message contains
   an '&' character

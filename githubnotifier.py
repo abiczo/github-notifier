@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import urllib2
+import httplib
 import Queue
 import threading
 import md5
@@ -37,24 +38,29 @@ def get_github_config():
 def get_github_user_info(username):
     info_cache = os.path.abspath(os.path.join(CACHE_DIR, username + '.json'))
     if not os.path.exists(info_cache):
-        # Fetch userinfo from github
-        url = 'http://github.com/api/v1/json/' + username
-        resp = urllib2.urlopen(url).read()
-        obj = json.loads(resp)
-        user = obj['user']
-        user['avatar_path'] = os.path.abspath(os.path.join(CACHE_DIR,
-                                                           username + '.jpg'))
+        try:
+            # Fetch userinfo from github
+            url = 'http://github.com/api/v1/json/' + username
+            resp = urllib2.urlopen(url).read()
+            obj = json.loads(resp)
+            user = obj['user']
 
-        # Cache the userinfo
-        fp = open(info_cache, 'w')
-        fp.write(json.dumps(user))
-        fp.close()
+            # Cache the userinfo
+            fp = open(info_cache, 'w')
+            fp.write(json.dumps(user))
+            fp.close()
+        except (urllib2.URLError, httplib.HTTPException):
+            # Create a 'fake' user object in case of network errors
+            user = {'login': username}
+
     else:
         # Use cached userinfo
         fp = open(info_cache, 'r')
         info = fp.read()
         user = json.loads(info)
 
+    user['avatar_path'] = os.path.abspath(os.path.join(CACHE_DIR,
+                                                       username + '.jpg'))
     if not os.path.exists(user['avatar_path']):
         # Fetch the user's gravatar
         if 'email' in user:
@@ -63,12 +69,15 @@ def get_github_user_info(username):
         else:
             gravatar_url = 'http://www.gravatar.com/avatar/?s=48'
 
-        avatar_data = urllib2.urlopen(gravatar_url).read()
+        try:
+            avatar_data = urllib2.urlopen(gravatar_url).read()
 
-        # Cache the image
-        fp = open(user['avatar_path'], 'wb')
-        fp.write(avatar_data)
-        fp.close()
+            # Cache the image
+            fp = open(user['avatar_path'], 'wb')
+            fp.write(avatar_data)
+            fp.close()
+        except (urllib2.URLError, httplib.HTTPException):
+            pass
 
     return user
 

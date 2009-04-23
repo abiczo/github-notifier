@@ -165,12 +165,14 @@ class GithubFeedUpdatherThread(threading.Thread):
         notification_queue.put(l)
 
 
-def display_notifications():
+def display_notifications(display_timeout=None):
     while True:
         try:
             items = notification_queue.get_nowait()
             for i in items:
                 n = pynotify.Notification(i['title'], i['message'], i['icon'])
+                if display_timeout:
+                    n.set_timeout(display_timeout * 1000)
                 n.show()
 
             notification_queue.task_done()
@@ -184,6 +186,9 @@ def main():
     parser.add_option('--no-systray-icon', dest='systray_icon',
                       action='store_false', default=True,
                       help='don\'t show the systray icon')
+    parser.add_option('-t', '--display-timeout',
+                      action='store', type='int', dest='timeout',
+                      help='set the notification display timeout (in seconds)')
     parser.add_option('-v', '--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='enable verbose logging')
@@ -219,11 +224,12 @@ def main():
     DISPLAY_INTERVAL = 1 # seconds
     if options.systray_icon:
         gui = GtkGui()
-        gobject.timeout_add(DISPLAY_INTERVAL * 1000, display_notifications)
+        gobject.timeout_add(DISPLAY_INTERVAL * 1000, display_notifications,
+                            options.timeout)
         gtk.main()
     else:
         while True:
-            display_notifications()
+            display_notifications(options.timeout)
             time.sleep(DISPLAY_INTERVAL)
 
 

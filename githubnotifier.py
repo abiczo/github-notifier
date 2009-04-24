@@ -171,7 +171,7 @@ def display_notifications(display_timeout=None):
             items = notification_queue.get_nowait()
             for i in items:
                 n = pynotify.Notification(i['title'], i['message'], i['icon'])
-                if display_timeout:
+                if display_timeout is not None:
                     n.set_timeout(display_timeout * 1000)
                 n.show()
 

@@ -198,6 +198,14 @@ def main():
                       help='enable verbose logging')
     (options, args) = parser.parse_args()
 
+    if options.interval <= 0:
+        print >>sys.stderr, 'Error: the update interval must be > 0.'
+        sys.exit(1)
+
+    if options.max_items <= 0:
+        print >>sys.stderr, 'Error: the maximum number of items must be > 0.'
+        sys.exit(1)
+
     log = logging.getLogger('github-notifier')
     log.addHandler(logging.StreamHandler())
     if options.verbose:

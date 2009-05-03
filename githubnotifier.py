@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import socket
 import urllib2
 import httplib
 import Queue
@@ -19,6 +20,8 @@ import gtk
 import pynotify
 
 __version__ = '0.1'
+
+SOCKET_TIMEOUT = 30
 
 CACHE_DIR = os.path.join(os.getenv('HOME'), '.githubnotifier', 'cache')
 
@@ -189,6 +192,8 @@ def display_notifications(display_timeout=None):
     return True
 
 def main():
+    socket.setdefaulttimeout(SOCKET_TIMEOUT)
+
     parser = optparse.OptionParser()
     parser.add_option('--no-systray-icon', dest='systray_icon',
                       action='store_false', default=True,

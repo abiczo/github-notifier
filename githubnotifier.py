@@ -9,7 +9,10 @@ import threading
 import md5
 import optparse
 import logging
-import simplejson as json
+try:
+    import json
+except ImportError:
+    import simplejson as json
 import feedparser
 
 import webbrowser

@@ -6,7 +6,7 @@ import urllib2
 import httplib
 import Queue
 import threading
-import md5
+import hashlib
 import optparse
 import logging
 try:
@@ -70,7 +70,7 @@ def get_github_user_info(username):
     if not os.path.exists(user['avatar_path']):
         # Fetch the user's gravatar
         if 'email' in user:
-            hexdig = md5.new(user['email'].lower()).hexdigest()
+            hexdig = hashlib.md5(user['email'].lower()).hexdigest()
             gravatar_url = 'http://www.gravatar.com/avatar/%s.jpg?s=48' % hexdig
         else:
             gravatar_url = 'http://www.gravatar.com/avatar/?s=48'

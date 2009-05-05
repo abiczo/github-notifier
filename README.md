@@ -6,6 +6,13 @@ This is a Linux/Python port of miyagawa's [github-growler][github-growler].
 It fetches your Github dashboard feeds and displays a notification
 for new items.
 
+Requirements
+------------
+
+* python 2.5 or 2.6
+* feedparser
+* simplejson (not needed for python 2.6)
+
 Install
 -------
 

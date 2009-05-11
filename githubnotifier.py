@@ -126,7 +126,7 @@ class GtkGui(object):
 
 
 class GithubFeedUpdatherThread(threading.Thread):
-    def __init__(self, user, token, interval, max_items):
+    def __init__(self, user, token, interval, max_items, hyperlinks):
         threading.Thread.__init__(self)
 
         self.feeds = [
@@ -135,6 +135,7 @@ class GithubFeedUpdatherThread(threading.Thread):
         ]
         self.interval = interval
         self.max_items = max_items
+        self.hyperlinks = hyperlinks
         self._seen = {}
 
     def run(self):
@@ -170,8 +171,16 @@ class GithubFeedUpdatherThread(threading.Thread):
                 users[item['author']] = get_github_user_info(item['author'])
 
             user = users[item['author']]
+            if self.hyperlinks and 'link' in item:
+                # simple heuristic: use the second word for the link
+                parts = item['title'].split(' ')
+                if len(parts) > 1:
+                    parts[1] = '<a href="%s">%s</a>' % (item['link'], parts[1])
+                message = ' '.join(parts)
+            else:
+                message = item['title']
             n = {'title': user.get('name', user['login']),
-                 'message': item['title'],
+                 'message': message,
                  'icon': user['avatar_path']}
             l.append(n)
 
@@ -237,6 +246,13 @@ def main():
         print >>sys.stderr, 'Error: couldn\'t initialize pynotify.'
         sys.exit(1)
 
+    server_caps = pynotify.get_server_caps()
+
+    if 'body-hyperlinks' in server_caps:
+        hyperlinks = True
+    else:
+        hyperlinks = False
+
     (user, token) = get_github_config()
     if not user or not token:
         print >>sys.stderr, 'Error: couldn\'t get github config.'
@@ -247,7 +263,7 @@ def main():
 
     # Start a new thread to check for feed updates
     upd = GithubFeedUpdatherThread(user, token, options.interval,
-                                   options.max_items)
+                                   options.max_items, hyperlinks)
     upd.setDaemon(True)
     upd.start()
 

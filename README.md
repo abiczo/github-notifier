@@ -16,16 +16,9 @@ Requirements
 Install
 -------
 
-### From source
+ First install the package dependencies
 
-As PyGTK can't be installed using setuptools you'll have to install PyGTK
-from your distribution. On Ubuntu you can do this using the following command:
-
-    apt-get install python-gtk2
-
-Then install the required dependencies:
-
-    easy_install feedparser simplejson
+    sudo apt-get install python-gtk2 python-feedparser python-simplejson
 
 Then clone the repository and install the module:
 

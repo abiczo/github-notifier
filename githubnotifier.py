@@ -28,6 +28,9 @@ SOCKET_TIMEOUT = 30
 
 CACHE_DIR = os.path.join(os.getenv('HOME'), '.githubnotifier', 'cache')
 
+GITHUB_BLOG_URL = 'https://github.com/blog.atom'
+GITHUB_BLOG_USER = 'GitHub Blog'
+
 notification_queue = Queue.Queue()
 
 def get_github_config():
@@ -90,7 +93,7 @@ def get_github_user_info(username):
 
 class GtkGui(object):
     def __init__(self):
-        icon_path = os.path.join(os.path.dirname(__file__), 'octocat.png')
+        icon_path = os.path.abspath('octocat.png')
         self.systray_icon = gtk.status_icon_new_from_file(
             os.path.abspath(icon_path))
 
@@ -126,13 +129,17 @@ class GtkGui(object):
 
 
 class GithubFeedUpdatherThread(threading.Thread):
-    def __init__(self, user, token, interval, max_items, hyperlinks):
+    def __init__(self, user, token, interval, max_items, hyperlinks, blog):
         threading.Thread.__init__(self)
 
         self.feeds = [
             'http://github.com/%s.private.atom?token=%s' % (user, token),
             'http://github.com/%s.private.actor.atom?token=%s' % (user, token),
         ]
+
+        if blog:
+            self.feeds.append(GITHUB_BLOG_URL)
+
         self.interval = interval
         self.max_items = max_items
         self.hyperlinks = hyperlinks
@@ -151,6 +158,10 @@ class GithubFeedUpdatherThread(threading.Thread):
         notifications = []
         for entry in feed.entries:
             if not entry['id'] in self._seen:
+
+                if feed_url is GITHUB_BLOG_URL:
+                    entry['author'] = GITHUB_BLOG_USER
+
                 notifications.append(entry)
                 self._seen[entry['id']] = 1
 
@@ -182,6 +193,10 @@ class GithubFeedUpdatherThread(threading.Thread):
             n = {'title': user.get('name', user['login']),
                  'message': message,
                  'icon': user['avatar_path']}
+            
+            if item['author'] == GITHUB_BLOG_USER:
+                n['icon'] = os.path.join(os.path.abspath('octocat.png'))
+
             l.append(n)
 
         notification_queue.put(l)
@@ -219,9 +234,13 @@ def main():
     parser.add_option('-t', '--display-timeout',
                       action='store', type='int', dest='timeout',
                       help='set the notification display timeout (in seconds)')
+    parser.add_option('-b', '--blog',
+                      action='store_true', dest='blog', default=False,
+                      help='enable notifications from GitHub\'s blog')
     parser.add_option('-v', '--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='enable verbose logging')
+    
     (options, args) = parser.parse_args()
 
     if options.interval <= 0:
@@ -263,7 +282,7 @@ def main():
 
     # Start a new thread to check for feed updates
     upd = GithubFeedUpdatherThread(user, token, options.interval,
-                                   options.max_items, hyperlinks)
+                                   options.max_items, hyperlinks, options.blog)
     upd.setDaemon(True)
     upd.start()
 

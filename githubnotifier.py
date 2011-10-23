@@ -193,9 +193,9 @@ class GithubFeedUpdatherThread(threading.Thread):
             n = {'title': user.get('name', user['login']),
                  'message': message,
                  'icon': user['avatar_path']}
-            
+
             if item['author'] == GITHUB_BLOG_USER:
-                n['icon'] = os.path.join(os.path.abspath('octocat.png'))
+                n['icon'] = os.path.abspath('octocat.png')
 
             l.append(n)
 

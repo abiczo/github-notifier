@@ -9,6 +9,7 @@ import threading
 import hashlib
 import optparse
 import logging
+import ConfigParser
 try:
     import json
 except ImportError:
@@ -27,6 +28,7 @@ __version__ = '0.1'
 SOCKET_TIMEOUT = 30
 
 CACHE_DIR = os.path.join(os.getenv('HOME'), '.githubnotifier', 'cache')
+CONFIG_FILE = os.path.join(os.getenv('HOME'), '.githubnotifier', 'config.cfg')
 
 GITHUB_BLOG_URL = 'https://github.com/blog.atom'
 GITHUB_BLOG_USER = 'GitHub Blog'
@@ -129,7 +131,8 @@ class GtkGui(object):
 
 
 class GithubFeedUpdatherThread(threading.Thread):
-    def __init__(self, user, token, interval, max_items, hyperlinks, blog):
+    def __init__(self, user, token, interval, max_items, hyperlinks, blog,
+                 important_authors, important_projects):
         threading.Thread.__init__(self)
 
         self.feeds = [
@@ -143,7 +146,53 @@ class GithubFeedUpdatherThread(threading.Thread):
         self.interval = interval
         self.max_items = max_items
         self.hyperlinks = hyperlinks
+        self.important_authors = important_authors
+        self.important_projects = important_projects
         self._seen = {}
+        self.authors = []
+        self.projects = []
+
+        config = ConfigParser.ConfigParser()
+        config.read(CONFIG_FILE)
+
+        # Acquire and set list of important authors and projects
+        self.acquire_authors(config)
+        self.acquire_projects(config)
+        
+
+    def acquire_authors(self, config):
+
+        # Make list of important authors
+        if self.important_authors:
+            authors = config.get("important", "authors")
+            for author in authors.split(','):
+                if len(author) > 0:  # Incase of blank line in config file
+                    #TODO if verbos say what we're looking for
+                    self.authors.append(author.strip())
+
+        # Check to ensure authors were acquired
+        if self.important_authors and len(self.authors) == 0:
+            print "No important author were found"
+            print "Ensure information is added to {}".format(CONFIG_FILE)
+            print "Disabling important author filter"
+            self.important_authors = False
+
+    def acquire_projects(self, config):
+        
+        # Make list of important projects
+        if self.important_projects:
+            projects = config.get("important", "projects")
+            for project in projects.split(','):
+                if len(project) > 1:  # Incase of blank line in config file
+                    self.projects.append(project.strip())
+
+        # Check to ensure projects were acquired
+        if self.important_projects and len(self.projects) == 0:
+            print "No important projects were found"
+            print "Ensure information is added to {}".format(CONFIG_FILE)
+            print "Disabling important project filter"
+            self.important_projects = False
+
 
     def run(self):
         while True:
@@ -173,11 +222,13 @@ class GithubFeedUpdatherThread(threading.Thread):
             notifications.extend(self.process_feed(feed_url))
 
         notifications.sort(key=lambda e: e['updated'])
+
         notifications = notifications[-self.max_items:]
 
         users = {}
         l = []
-        for item in notifications:
+        for item in notifications:            
+            
             if not item['author'] in users:
                 users[item['author']] = get_github_user_info(item['author'])
 
@@ -196,10 +247,60 @@ class GithubFeedUpdatherThread(threading.Thread):
 
             if item['author'] == GITHUB_BLOG_USER:
                 n['icon'] = os.path.abspath('octocat.png')
+            
+            found_project = False
+            if self.important_projects:
+                for project in self.projects:
+                    if '/' in project:
+                        parts = project.split('/')
+                        found_project = important_repository(item['link'], parts[1], parts[0])
+                    else:
+                        found_project = important_repository(item['link'], project)
+                    if found_project:
+                        break
 
-            l.append(n)
+            found_author = False
+            if self.important_authors:
+                for author in self.authors:
+                    if item['authors'][0]['name'] == author:
+                        found_author = True
+                        break
+
+            if self.important_authors and found_author:
+                l.append(n)
+            elif self.important_projects and found_project:
+                l.append(n)
+            elif not self.important_authors and not self.important_projects:
+                l.append(n)
 
         notification_queue.put(l)
+
+
+def important_repository(link, project, projectOwner=None):
+    parts = link.split("/")
+    important = False
+    ownerFound = False
+
+    for part in parts:
+
+        if str(part) == projectOwner:
+            ownerFound = True
+        elif str(part) == project:
+            important = True
+            break
+        else:        
+            # Reset owner found back, the project must be right after owner for it 
+            # to count as a unique project (ex: owner/project)
+            ownerFound = False
+
+    if important and ownerFound and projectOwner is not None:
+        return True
+    elif important and not ownerFound and projectOwner is not None:
+        return False
+    elif important and projectOwner is None:
+        return True
+    else: 
+        return False
 
 
 def display_notifications(display_timeout=None):
@@ -237,6 +338,12 @@ def main():
     parser.add_option('-b', '--blog',
                       action='store_true', dest='blog', default=False,
                       help='enable notifications from GitHub\'s blog')
+    parser.add_option('-a', '--important_authors',
+                      action='store_true', dest='important_authors', default=False,
+                      help='only consider notifications from important authors')
+    parser.add_option('-p', '--important_projects',
+                      action='store_true', dest='important_projects', default=False,
+                      help='only consider notifications from important projects')
     parser.add_option('-v', '--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='enable verbose logging')
@@ -261,6 +368,13 @@ def main():
     if not os.path.isdir(CACHE_DIR):
         os.makedirs(CACHE_DIR)
 
+    if not os.path.isfile(CONFIG_FILE):
+        config_file = open(CONFIG_FILE, 'w')
+        config_file.write("[important]  # Separated by commas, projects (can" \
+                          " be either <user>/<project> or <project>)\n")
+        config_file.write("authors=\nprojects=")
+        config_file.close()
+
     if not pynotify.init('github-notifier'):
         print >>sys.stderr, 'Error: couldn\'t initialize pynotify.'
         sys.exit(1)
@@ -282,7 +396,9 @@ def main():
 
     # Start a new thread to check for feed updates
     upd = GithubFeedUpdatherThread(user, token, options.interval,
-                                   options.max_items, hyperlinks, options.blog)
+                                   options.max_items, hyperlinks, options.blog,
+                                   options.important_authors, 
+                                   options.important_projects)
     upd.setDaemon(True)
     upd.start()
 

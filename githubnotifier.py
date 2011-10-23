@@ -35,6 +35,7 @@ GITHUB_BLOG_USER = 'GitHub Blog'
 
 notification_queue = Queue.Queue()
 
+
 def get_github_config():
     fp = os.popen('git config --get github.user')
     user = fp.readline().strip()
@@ -45,6 +46,7 @@ def get_github_config():
     fp.close()
 
     return (user, token)
+
 
 def get_github_user_info(username):
     info_cache = os.path.abspath(os.path.join(CACHE_DIR, username + '.json'))
@@ -135,12 +137,15 @@ class GithubFeedUpdatherThread(threading.Thread):
                  important_authors, important_projects):
         threading.Thread.__init__(self)
 
+        self.logger = logging.getLogger('github-notifier')
+
         self.feeds = [
             'http://github.com/%s.private.atom?token=%s' % (user, token),
             'http://github.com/%s.private.actor.atom?token=%s' % (user, token),
         ]
 
         if blog:
+            self.logger.info("Observing the GitHub Blog")
             self.feeds.append(GITHUB_BLOG_URL)
 
         self.interval = interval
@@ -158,7 +163,6 @@ class GithubFeedUpdatherThread(threading.Thread):
         # Acquire and set list of important authors and projects
         self.acquire_authors(config)
         self.acquire_projects(config)
-        
 
     def acquire_authors(self, config):
 
@@ -166,33 +170,31 @@ class GithubFeedUpdatherThread(threading.Thread):
         if self.important_authors:
             authors = config.get("important", "authors")
             for author in authors.split(','):
-                if len(author) > 0:  # Incase of blank line in config file
-                    #TODO if verbos say what we're looking for
+                if len(author) > 0:
+                    self.logger.info("Important Author: {}".format(author))
                     self.authors.append(author.strip())
 
         # Check to ensure authors were acquired
         if self.important_authors and len(self.authors) == 0:
-            print "No important author were found"
-            print "Ensure information is added to {}".format(CONFIG_FILE)
-            print "Disabling important author filter"
+            self.logger.warning("No important authors were found, ensure the"\
+                                " config is correct. Disabling author filer")
             self.important_authors = False
 
     def acquire_projects(self, config):
-        
+
         # Make list of important projects
         if self.important_projects:
             projects = config.get("important", "projects")
             for project in projects.split(','):
-                if len(project) > 1:  # Incase of blank line in config file
+                if len(project) > 1:
+                    self.logger.info("Important Project: {}".format(project))
                     self.projects.append(project.strip())
 
         # Check to ensure projects were acquired
         if self.important_projects and len(self.projects) == 0:
-            print "No important projects were found"
-            print "Ensure information is added to {}".format(CONFIG_FILE)
-            print "Disabling important project filter"
+            self.logger.warning("No important projects were found, ensure the"\
+                                " config is correct. Disabling project filer")
             self.important_projects = False
-
 
     def run(self):
         while True:
@@ -200,8 +202,7 @@ class GithubFeedUpdatherThread(threading.Thread):
             time.sleep(self.interval)
 
     def process_feed(self, feed_url):
-        log = logging.getLogger('github-notifier')
-        log.info('Fetching feed %s' % feed_url)
+        self.logger.info('Fetching feed %s' % feed_url)
         feed = feedparser.parse(feed_url)
 
         notifications = []
@@ -227,8 +228,8 @@ class GithubFeedUpdatherThread(threading.Thread):
 
         users = {}
         l = []
-        for item in notifications:            
-            
+        for item in notifications:
+
             if not item['author'] in users:
                 users[item['author']] = get_github_user_info(item['author'])
 
@@ -246,16 +247,19 @@ class GithubFeedUpdatherThread(threading.Thread):
                  'icon': user['avatar_path']}
 
             if item['author'] == GITHUB_BLOG_USER:
+                self.logger.info("Found GitHub Blog item entry")
                 n['icon'] = os.path.abspath('octocat.png')
-            
+
             found_project = False
             if self.important_projects:
                 for project in self.projects:
                     if '/' in project:
                         parts = project.split('/')
-                        found_project = important_repository(item['link'], parts[1], parts[0])
+                        found_project = self.important_repository(item['link'],
+                                            parts[1], parts[0])
                     else:
-                        found_project = important_repository(item['link'], project)
+                        found_project = self.important_repository(item['link'],
+                                            project)
                     if found_project:
                         break
 
@@ -267,40 +271,42 @@ class GithubFeedUpdatherThread(threading.Thread):
                         break
 
             if self.important_authors and found_author:
+                self.logger.info("Found important author item entry")
                 l.append(n)
             elif self.important_projects and found_project:
+                self.logger.info("Found important project item entry")
                 l.append(n)
             elif not self.important_authors and not self.important_projects:
+                self.logger.info("Found item entry")
                 l.append(n)
 
         notification_queue.put(l)
 
+    def important_repository(self, link, project, projectOwner=None):
+        parts = link.split("/")
+        important = False
+        ownerFound = False
 
-def important_repository(link, project, projectOwner=None):
-    parts = link.split("/")
-    important = False
-    ownerFound = False
+        for part in parts:
 
-    for part in parts:
+            if str(part) == projectOwner:
+                ownerFound = True
+            elif str(part) == project:
+                important = True
+                break
+            else:
+                # Reset owner found back, the project must be right after owner
+                # for it to count as a unique project (ex: owner/project)
+                ownerFound = False
 
-        if str(part) == projectOwner:
-            ownerFound = True
-        elif str(part) == project:
-            important = True
-            break
-        else:        
-            # Reset owner found back, the project must be right after owner for it 
-            # to count as a unique project (ex: owner/project)
-            ownerFound = False
-
-    if important and ownerFound and projectOwner is not None:
-        return True
-    elif important and not ownerFound and projectOwner is not None:
-        return False
-    elif important and projectOwner is None:
-        return True
-    else: 
-        return False
+        if important and ownerFound and projectOwner is not None:
+            return True
+        elif important and not ownerFound and projectOwner is not None:
+            return False
+        elif important and projectOwner is None:
+            return True
+        else:
+            return False
 
 
 def display_notifications(display_timeout=None):
@@ -318,6 +324,7 @@ def display_notifications(display_timeout=None):
             break
 
     return True
+
 
 def main():
     socket.setdefaulttimeout(SOCKET_TIMEOUT)
@@ -347,28 +354,37 @@ def main():
     parser.add_option('-v', '--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='enable verbose logging')
-    
+
     (options, args) = parser.parse_args()
 
+    # Create logger
+    logger = logging.getLogger('github-notifier')
+    handler = logging.StreamHandler()
+
+    if options.verbose:
+        logger.setLevel(logging.INFO)
+    else:
+        logger.setLevel(logging.WARNING)
+
+    formatter = logging.Formatter("[%(levelname)s] %(asctime)s\n%(message)s",
+                                    datefmt="%d %b %H:%M:%S")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
     if options.interval <= 0:
-        print >>sys.stderr, 'Error: the update interval must be > 0.'
+        logger.error("The update interval must be > 0")
         sys.exit(1)
 
     if options.max_items <= 0:
-        print >>sys.stderr, 'Error: the maximum number of items must be > 0.'
+        logger.error("The maximum number of items must be > 0")
         sys.exit(1)
 
-    log = logging.getLogger('github-notifier')
-    log.addHandler(logging.StreamHandler())
-    if options.verbose:
-        log.setLevel(logging.INFO)
-    else:
-        log.setLevel(logging.ERROR)
-
     if not os.path.isdir(CACHE_DIR):
+        logger.warning("Making the cache directory {}".format(CACHE_DIR))
         os.makedirs(CACHE_DIR)
 
     if not os.path.isfile(CONFIG_FILE):
+        logger.warning("Making the config file {}".format(CONFIG_FILE))
         config_file = open(CONFIG_FILE, 'w')
         config_file.write("[important]  # Separated by commas, projects (can" \
                           " be either <user>/<project> or <project>)\n")
@@ -376,33 +392,35 @@ def main():
         config_file.close()
 
     if not pynotify.init('github-notifier'):
-        print >>sys.stderr, 'Error: couldn\'t initialize pynotify.'
+        logger.error("Couldn\'t initialize pynotify")
         sys.exit(1)
 
     server_caps = pynotify.get_server_caps()
-
     if 'body-hyperlinks' in server_caps:
+        logger.info("github-notifier is capable of using hyperlinks")
         hyperlinks = True
     else:
+        logger.info("github-notifier is not capable of using hyperlinks")
         hyperlinks = False
 
     (user, token) = get_github_config()
     if not user or not token:
-        print >>sys.stderr, 'Error: couldn\'t get github config.'
+        logger.error("Could not get GitHub username and token from git config")
         sys.exit(1)
 
     if options.systray_icon:
+        logger.info("Creating system tray icon")
         gtk.gdk.threads_init()
 
     # Start a new thread to check for feed updates
     upd = GithubFeedUpdatherThread(user, token, options.interval,
                                    options.max_items, hyperlinks, options.blog,
-                                   options.important_authors, 
+                                   options.important_authors,
                                    options.important_projects)
     upd.setDaemon(True)
     upd.start()
 
-    DISPLAY_INTERVAL = 1 # seconds
+    DISPLAY_INTERVAL = 1  # In seconds
     if options.systray_icon:
         gui = GtkGui()
         gobject.timeout_add(DISPLAY_INTERVAL * 1000, display_notifications,

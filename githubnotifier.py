@@ -32,6 +32,7 @@ CONFIG_FILE = os.path.join(os.getenv('HOME'), '.githubnotifier', 'config.cfg')
 
 GITHUB_BLOG_URL = 'https://github.com/blog.atom'
 GITHUB_BLOG_USER = 'GitHub Blog'
+GITHUB_URL = "https://github.com/"
 
 notification_queue = Queue.Queue()
 
@@ -98,10 +99,14 @@ def get_github_user_info(username):
 class GtkGui(object):
     def __init__(self):
         icon_path = os.path.abspath('octocat.png')
-        self.systray_icon = gtk.status_icon_new_from_file(
-            os.path.abspath(icon_path))
+        self.systray_icon = gtk.status_icon_new_from_file(icon_path)
 
         self.menu = gtk.Menu()
+
+        menu_github = gtk.MenuItem("Open GitHub")
+        menu_github.connect('activate', self.show_github)
+        menu_github.show()
+        self.menu.append(menu_github)
 
         menu_about = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
         menu_about.connect('activate', self.show_about)
@@ -118,6 +123,9 @@ class GtkGui(object):
     def show_menu(self, icon, button, time):
         self.menu.popup(None, None, gtk.status_icon_position_menu, button,
                         time, icon)
+
+    def show_github(self, item):
+        webbrowser.open(GITHUB_URL)
 
     def show_about(self, item):
         dlg = gtk.AboutDialog()

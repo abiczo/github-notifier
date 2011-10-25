@@ -97,8 +97,11 @@ def get_github_user_info(username):
 
 
 class GtkGui(object):
-    def __init__(self):
-        icon_path = os.path.abspath('octocat.png')
+    def __init__(self, upd):
+        self.upd = upd
+        self.logger = logging.getLogger('github-notifier')
+
+        icon_path = os.path.abspath(os.path.join(os.path.dirname(__file__), 'octocat.png'))
         self.systray_icon = gtk.status_icon_new_from_file(icon_path)
 
         self.menu = gtk.Menu()
@@ -107,6 +110,16 @@ class GtkGui(object):
         menu_github.connect('activate', self.show_github)
         menu_github.show()
         self.menu.append(menu_github)
+
+        menu_authors = gtk.CheckMenuItem("Filter Important Authors")
+        menu_authors.connect('activate', self.filter_authors)
+        menu_authors.show()
+        self.menu.append(menu_authors)
+
+        menu_projects = gtk.CheckMenuItem("Filter Important Projects")
+        menu_projects.connect('activate', self.filter_projects)
+        menu_projects.show()
+        self.menu.append(menu_projects)
 
         menu_about = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
         menu_about.connect('activate', self.show_about)
@@ -120,14 +133,51 @@ class GtkGui(object):
 
         self.systray_icon.connect('popup_menu', self.show_menu)
 
+        if self.upd.important_authors:
+            menu_authors.set_active(True)
+        else:
+            menu_authors.set_active(False)
+
+        if self.upd.important_projects:
+            menu_projects.set_active(True)
+        else:
+            menu_projects.set_active(False)
+
     def show_menu(self, icon, button, time):
+        self.logger.info("Opening menu")
         self.menu.popup(None, None, gtk.status_icon_position_menu, button,
                         time, icon)
 
+    def filter_authors(self, item):
+        if item.active:
+            self.logger.info("Enabling author filter")
+            self.upd.important_authors = True
+            
+            config = ConfigParser.ConfigParser()
+            config.read(CONFIG_FILE)
+            self.upd.acquire_authors(config)
+        else:
+            self.upd.important_authors = False
+            self.logger.info("Disabling author filter")
+            
+    def filter_projects(self, item):
+        if item.active:
+            self.logger.info("Enabling project filter")
+            self.upd.important_projects = True
+            
+            config = ConfigParser.ConfigParser()
+            config.read(CONFIG_FILE)
+            self.upd.acquire_projects(config)
+        else:
+            self.upd.important_projects = False
+            self.logger.info("Disabling project filter")
+            
     def show_github(self, item):
+        self.logger.info("Opening GitHub website")
         webbrowser.open(GITHUB_URL)
 
     def show_about(self, item):
+        self.logger.info("Showing about dialog")
         dlg = gtk.AboutDialog()
         dlg.set_name('GitHub Notifier')
         dlg.set_version(__version__)
@@ -164,13 +214,6 @@ class GithubFeedUpdatherThread(threading.Thread):
         self._seen = {}
         self.authors = []
         self.projects = []
-
-        config = ConfigParser.ConfigParser()
-        config.read(CONFIG_FILE)
-
-        # Acquire and set list of important authors and projects
-        self.acquire_authors(config)
-        self.acquire_projects(config)
 
     def acquire_authors(self, config):
         # Make list of important authors
@@ -411,7 +454,7 @@ def main():
 
     DISPLAY_INTERVAL = 1  # In seconds
     if options.systray_icon:
-        gui = GtkGui()
+        gui = GtkGui(upd)
         gobject.timeout_add(DISPLAY_INTERVAL * 1000, display_notifications,
                             options.timeout)
         gtk.main()

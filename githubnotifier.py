@@ -111,12 +111,12 @@ class GtkGui(object):
         menu_github.show()
         self.menu.append(menu_github)
 
-        menu_authors = gtk.CheckMenuItem("Filter Important Authors")
+        menu_authors = gtk.CheckMenuItem('Filter Important Authors')
         menu_authors.connect('activate', self.filter_authors)
         menu_authors.show()
         self.menu.append(menu_authors)
 
-        menu_projects = gtk.CheckMenuItem("Filter Important Projects")
+        menu_projects = gtk.CheckMenuItem('Filter Important Projects')
         menu_projects.connect('activate', self.filter_projects)
         menu_projects.show()
         self.menu.append(menu_projects)
@@ -144,40 +144,38 @@ class GtkGui(object):
             menu_projects.set_active(False)
 
     def show_menu(self, icon, button, time):
-        self.logger.info("Opening menu")
+        self.logger.info('Opening menu')
         self.menu.popup(None, None, gtk.status_icon_position_menu, button,
                         time, icon)
 
     def filter_authors(self, item):
         if item.active:
-            self.logger.info("Enabling author filter")
-            self.upd.important_authors = True
-            
+            self.logger.info('Enabling author filter')
             config = ConfigParser.ConfigParser()
             config.read(CONFIG_FILE)
             self.upd.acquire_authors(config)
+            self.upd.important_authors = True
         else:
+            self.logger.info('Disabling author filter')
             self.upd.important_authors = False
-            self.logger.info("Disabling author filter")
-            
+
     def filter_projects(self, item):
         if item.active:
-            self.logger.info("Enabling project filter")
-            self.upd.important_projects = True
-            
+            self.logger.info('Enabling project filter')
             config = ConfigParser.ConfigParser()
             config.read(CONFIG_FILE)
             self.upd.acquire_projects(config)
+            self.upd.important_projects = True
         else:
+            self.logger.info('Disabling project filter')
             self.upd.important_projects = False
-            self.logger.info("Disabling project filter")
-            
+
     def show_github(self, item):
-        self.logger.info("Opening GitHub website")
+        self.logger.info('Opening GitHub website')
         webbrowser.open(GITHUB_URL)
 
     def show_about(self, item):
-        self.logger.info("Showing about dialog")
+        self.logger.info('Showing about dialog')
         dlg = gtk.AboutDialog()
         dlg.set_name('GitHub Notifier')
         dlg.set_version(__version__)
@@ -217,26 +215,24 @@ class GithubFeedUpdatherThread(threading.Thread):
 
     def acquire_authors(self, config):
         # Make list of important authors
-        if self.important_authors:
-            authors = config.get('important', 'authors')
-            self.authors = [author for author in authors.split(',') if author]
-            self.logger.info('Important Author: {}'.format(self.authors))
+        authors = config.get('important', 'authors')
+        self.authors = [author for author in authors.split(',') if author]
+        self.logger.info('Important Author: {}'.format(self.authors))
 
         # Check to ensure authors were acquired
-        if self.important_authors and not self.authors:
+        if not self.authors:
             self.logger.warning('No important authors were found, ensure the'\
                                 ' config is correct. Disabling author filter')
             self.important_authors = False
 
     def acquire_projects(self, config):
         # Make list of important projects
-        if self.important_projects:
-            projects = config.get('important', 'projects')
-            self.projects = [project for project in projects.split(',') if project]
-            self.logger.info('Important Project: {}'.format(self.projects))
+        projects = config.get('important', 'projects')
+        self.projects = [project for project in projects.split(',') if project]
+        self.logger.info('Important Project: {}'.format(self.projects))
 
         # Check to ensure projects were acquired
-        if self.important_projects and not self.projects:
+        if not self.projects:
             self.logger.warning('No important projects were found, ensure the'\
                                 ' config is correct. Disabling project filter')
             self.important_projects = False

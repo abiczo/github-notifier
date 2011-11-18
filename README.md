@@ -52,11 +52,12 @@ the `-p` flag. A *config.cfg* file is present within your *~/.githubnotifier/*
 directory. The file will be generated if it is not present at run-time.
 
 The *config.cfg* format is as follows:
-    
+
     [important]
     authors=bob,fred,mary
     projects=github-notifier,rails,bob/my-project
-    
+    oneself=dev1,dev2
+
 This configuration will only show notifications that have *bob*, *fred* or
 *mary* as the authors. The projects can either be in a general format (ex:
 *github-notifier* or *rails*) to only show notifications that deal with either
@@ -64,6 +65,13 @@ of those projects. The general format will show notifications that match the
 project name, regardless of who is the owner of the repository. The stricter
 format (ex: *bob/my-project*) will only show notifications of the *my-project*
 repository if the owner if *bob*.
+
+It is also possible to filter out items where oneself is the author of them.
+The idea is to reduce the number of notifications one receives when activly
+using GitHub.  The filter can be toggled from the system tray icon, or can be
+activated via the `-s` command line parameter. The *oneself* entry in the
+*config.cfg* file is where the authors of oneself are placed, it is possible to
+have more then one (ex: dev1 and dev2 are both the same person).
 
 TODO
 ----

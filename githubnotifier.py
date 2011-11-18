@@ -121,6 +121,11 @@ class GtkGui(object):
         menu_projects.show()
         self.menu.append(menu_projects)
 
+        menu_self = gtk.CheckMenuItem('Filter Oneself')
+        menu_self.connect('activate', self.filter_self)
+        menu_self.show()
+        self.menu.append(menu_self)
+
         menu_about = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
         menu_about.connect('activate', self.show_about)
         menu_about.show()
@@ -142,6 +147,11 @@ class GtkGui(object):
             menu_projects.set_active(True)
         else:
             menu_projects.set_active(False)
+
+        if self.upd.filter_self:
+            menu_self.set_active(True)
+        else:
+            menu_self.set_active(False)
 
     def show_menu(self, icon, button, time):
         self.logger.info('Opening menu')
@@ -170,6 +180,17 @@ class GtkGui(object):
             self.logger.info('Disabling project filter')
             self.upd.important_projects = False
 
+    def filter_self(self, item):
+        if item.active:
+            self.logger.info('Enabling oneself filter')
+            config = ConfigParser.ConfigParser()
+            config.read(CONFIG_FILE)
+            self.upd.acquire_self(config)
+            self.upd.filter_self = True
+        else:
+            self.logger.info('Disabling oneself filter')
+            self.upd.filter_self = False
+
     def show_github(self, item):
         self.logger.info('Opening GitHub website')
         webbrowser.open(GITHUB_URL)
@@ -190,7 +211,7 @@ class GtkGui(object):
 
 class GithubFeedUpdatherThread(threading.Thread):
     def __init__(self, user, token, interval, max_items, hyperlinks, blog,
-                 important_authors, important_projects):
+                 important_authors, important_projects, filter_self):
         threading.Thread.__init__(self)
 
         self.logger = logging.getLogger('github-notifier')
@@ -209,9 +230,11 @@ class GithubFeedUpdatherThread(threading.Thread):
         self.hyperlinks = hyperlinks
         self.important_authors = important_authors
         self.important_projects = important_projects
+        self.filter_self = filter_self
         self._seen = {}
         self.authors = []
         self.projects = []
+        self.oneself = []
 
     def acquire_authors(self, config):
         # Make list of important authors
@@ -236,6 +259,18 @@ class GithubFeedUpdatherThread(threading.Thread):
             self.logger.warning('No important projects were found, ensure the'\
                                 ' config is correct. Disabling project filter')
             self.important_projects = False
+
+    def acquire_self(self, config):
+        # Acquire list of oneself
+        oneself = config.get('important', 'oneself')
+        self.oneself = [author for author in oneself.split(',') if author]
+        self.logger.info('Oneself: {}'.format(self.oneself))
+
+        # Check to ensure an author was acquired
+        if not self.oneself:
+            self.logger.warning('No authors were found for oneself, ensure the'\
+                                ' config is correct. Disabling oneself filter')
+            self.filter_self = False
 
     def run(self):
         while True:
@@ -285,6 +320,11 @@ class GithubFeedUpdatherThread(threading.Thread):
             n = {'title': user.get('name', user['login']),
                  'message': message,
                  'icon': user['avatar_path']}
+
+            # Check to see if entry is one's self
+            if self.filter_self and item['authors'][0]['name']  in self.oneself:
+              self.logger.info('Ignoring own entry')
+              continue
 
             # Check for GitHub Blog entry
             if item['author'] == GITHUB_BLOG_USER:
@@ -379,10 +419,12 @@ def main():
     parser.add_option('-p', '--important_projects',
                       action='store_true', dest='important_projects', default=False,
                       help='only consider notifications from important projects')
+    parser.add_option('-s', '--filter_self',
+                      action='store_true', dest='filter_self', default=False,
+                      help='filter out entires that are made by oneself')
     parser.add_option('-v', '--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='enable verbose logging')
-
     (options, args) = parser.parse_args()
 
     # Create logger
@@ -416,7 +458,7 @@ def main():
         config_file = open(CONFIG_FILE, 'w')
         config_file.write('[important]  # Separated by commas, projects (can' \
                           ' be either <user>/<project> or <project>)\n')
-        config_file.write('authors=\nprojects=')
+        config_file.write('authors=\nprojects=\noneself=')
         config_file.close()
 
     if not pynotify.init('github-notifier'):
@@ -444,7 +486,8 @@ def main():
     upd = GithubFeedUpdatherThread(user, token, options.interval,
                                    options.max_items, hyperlinks, options.blog,
                                    options.important_authors,
-                                   options.important_projects)
+                                   options.important_projects,
+                                   options.filter_self)
     upd.setDaemon(True)
     upd.start()
 

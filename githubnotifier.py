@@ -169,7 +169,8 @@ class GtkGui(object):
             self.logger.info('Enabling important authors')
             config = ConfigParser.ConfigParser()
             config.read(CONFIG_FILE)
-            if self.upd.acquire_important_authors(config):
+            items = self.upd.acquire_items(config, "important", "authors")
+            if items:
                 self.upd.important_authors = True
             else:
                 self.menu_important_authors.set_active(False)
@@ -182,7 +183,8 @@ class GtkGui(object):
             self.logger.info('Enabling important projects')
             config = ConfigParser.ConfigParser()
             config.read(CONFIG_FILE)
-            if self.upd.acquire_important_projects(config):
+            items = self.upd.acquire_items(config, "important", "projects")
+            if items:
                 self.upd.important_projects = True
             else:
                 self.menu_important_projects.set_active(False)
@@ -195,7 +197,8 @@ class GtkGui(object):
             self.logger.info('Enabling blacklist authors')
             config = ConfigParser.ConfigParser()
             config.read(CONFIG_FILE)
-            if self.upd.acquire_blacklist_authors(config):
+            items = self.upd.acquire_items(config, "blacklist", "authors")
+            if items:
                 self.upd.blacklist_authors = True
             else:
                 self.menu_blacklist_authors.set_active(False)
@@ -208,7 +211,8 @@ class GtkGui(object):
             self.logger.info('Enabling blacklist projects')
             config = ConfigParser.ConfigParser()
             config.read(CONFIG_FILE)
-            if self.upd.acquire_blacklist_projects(config):
+            items = self.upd.acquire_items(config, "blacklist", "projects")
+            if items:
                 self.upd.blacklist_projects = True
             else:
                 self.menu_blacklist_projects.set_active(False)
@@ -264,57 +268,11 @@ class GithubFeedUpdatherThread(threading.Thread):
         self.list_blacklist_authors = []
         self.list_blacklist_projects = []
 
-    def acquire_important_authors(self, config):
-        # Make list of important authors
-        authors = config.get('important', 'authors')
-        self.list_important_authors = [author for author in authors.split(',') if author]
-        self.logger.info('Important Author: {}'.format(self.list_important_authors))
-
-        # Check to ensure authors were acquired
-        if not self.list_important_authors:
-            self.logger.warning('No important authors were found')
-            return False
-        else:
-            return True
-
-    def acquire_important_projects(self, config):
-        # Make list of important projects
-        projects = config.get('important', 'projects')
-        self.list_important_projects = [project for project in projects.split(',') if project]
-        self.logger.info('Important Project: {}'.format(self.list_important_projects))
-
-        # Check to ensure projects were acquired
-        if not self.list_important_projects:
-            self.logger.warning('No important projects were found')
-            return False
-        else:
-            return True
-
-    def acquire_blacklist_authors(self, config):
-        # Make list of blacklist authors
-        authors = config.get('blacklist', 'authors')
-        self.list_blacklist_authors = [author for author in authors.split(',') if author]
-        self.logger.info('Blacklist Author: {}'.format(self.list_blacklist_authors))
-
-        # Check to ensure authors were acquired
-        if not self.list_blacklist_authors:
-            self.logger.warning('No blacklist authors were found, ensure the')
-            return False
-        else:
-            return True
-
-    def acquire_blacklist_projects(self, config):
-        # Make list of blacklist projects
-        projects = config.get('blacklist', 'projects')
-        self.list_blacklist_projects = [project for project in projects.split(',') if project]
-        self.logger.info('Blacklist Project: {}'.format(self.list_blacklist_projects))
-
-        # Check to ensure projects were acquired
-        if not self.list_blacklist_projects:
-            self.logger.warning('No blacklist projects were found, ensure the')
-            return False
-        else:
-            return True
+    def acquire_items(self, config, category, items):
+        config_items = config.get(category, items)
+        aquired_items = [item for item in config_items.split(',') if item]
+        self.logger.info("Items in {} {}: {}".format(category, items, aquired_items))
+        return aquired_items
 
     def run(self):
         while True:

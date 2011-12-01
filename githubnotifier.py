@@ -111,20 +111,25 @@ class GtkGui(object):
         menu_github.show()
         self.menu.append(menu_github)
 
-        menu_authors = gtk.CheckMenuItem('Filter Important Authors')
-        menu_authors.connect('activate', self.filter_authors)
-        menu_authors.show()
-        self.menu.append(menu_authors)
+        menu_important_authors = gtk.CheckMenuItem('Only Important Authors')
+        menu_important_authors.connect('activate', self.important_authors)
+        menu_important_authors.show()
+        self.menu.append(menu_important_authors)
 
-        menu_projects = gtk.CheckMenuItem('Filter Important Projects')
-        menu_projects.connect('activate', self.filter_projects)
-        menu_projects.show()
-        self.menu.append(menu_projects)
+        menu_important_projects = gtk.CheckMenuItem('Only Important Projects')
+        menu_important_projects.connect('activate', self.important_projects)
+        menu_important_projects.show()
+        self.menu.append(menu_important_projects)
 
-        menu_self = gtk.CheckMenuItem('Filter Oneself')
-        menu_self.connect('activate', self.filter_self)
-        menu_self.show()
-        self.menu.append(menu_self)
+        menu_blacklist_authors = gtk.CheckMenuItem('Exclude Blacklisted Authors')
+        menu_blacklist_authors.connect('activate', self.blacklist_authors)
+        menu_blacklist_authors.show()
+        self.menu.append(menu_blacklist_authors)
+
+        menu_blacklist_projects = gtk.CheckMenuItem('Exclude Blacklisted Projects')
+        menu_blacklist_projects.connect('activate', self.blacklist_projects)
+        menu_blacklist_projects.show()
+        self.menu.append(menu_blacklist_projects)
 
         menu_about = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
         menu_about.connect('activate', self.show_about)
@@ -136,60 +141,80 @@ class GtkGui(object):
         menu_quit.show()
         self.menu.append(menu_quit)
 
+        # References to the CheckMenuItems
+        self.menu_important_authors = menu_important_authors
+        self.menu_important_projects = menu_important_projects
+        self.menu_blacklist_authors = menu_blacklist_authors
+        self.menu_blacklist_projects = menu_blacklist_projects
+
         self.systray_icon.connect('popup_menu', self.show_menu)
 
+        # Initialize the CheckMenuItems
         if self.upd.important_authors:
-            menu_authors.set_active(True)
-        else:
-            menu_authors.set_active(False)
-
+            menu_important_authors.set_active(True)
         if self.upd.important_projects:
-            menu_projects.set_active(True)
-        else:
-            menu_projects.set_active(False)
-
-        if self.upd.filter_self:
-            menu_self.set_active(True)
-        else:
-            menu_self.set_active(False)
+            menu_important_projects.set_active(True)
+        if self.upd.blacklist_authors:
+            menu_blacklist_authors.set_active(True)
+        if self.upd.blacklist_projects:
+            menu_blacklist_projects.set_active(True)
 
     def show_menu(self, icon, button, time):
         self.logger.info('Opening menu')
         self.menu.popup(None, None, gtk.status_icon_position_menu, button,
                         time, icon)
 
-    def filter_authors(self, item):
+    def important_authors(self, item):
         if item.active:
-            self.logger.info('Enabling author filter')
+            self.logger.info('Enabling important authors')
             config = ConfigParser.ConfigParser()
             config.read(CONFIG_FILE)
-            self.upd.acquire_authors(config)
-            self.upd.important_authors = True
+            if self.upd.acquire_important_authors(config):
+                self.upd.important_authors = True
+            else:
+                self.menu_important_authors.set_active(False)
         else:
-            self.logger.info('Disabling author filter')
+            self.logger.info('Disabling important authors')
             self.upd.important_authors = False
 
-    def filter_projects(self, item):
+    def important_projects(self, item):
         if item.active:
-            self.logger.info('Enabling project filter')
+            self.logger.info('Enabling important projects')
             config = ConfigParser.ConfigParser()
             config.read(CONFIG_FILE)
-            self.upd.acquire_projects(config)
-            self.upd.important_projects = True
+            if self.upd.acquire_important_projects(config):
+                self.upd.important_projects = True
+            else:
+                self.menu_important_projects.set_active(False)
         else:
-            self.logger.info('Disabling project filter')
+            self.logger.info('Disabling important projects')
             self.upd.important_projects = False
 
-    def filter_self(self, item):
+    def blacklist_authors(self, item):
         if item.active:
-            self.logger.info('Enabling oneself filter')
+            self.logger.info('Enabling blacklist authors')
             config = ConfigParser.ConfigParser()
             config.read(CONFIG_FILE)
-            self.upd.acquire_self(config)
-            self.upd.filter_self = True
+            if self.upd.acquire_blacklist_authors(config):
+                self.upd.blacklist_authors = True
+            else:
+                self.menu_blacklist_authors.set_active(False)
         else:
-            self.logger.info('Disabling oneself filter')
-            self.upd.filter_self = False
+            self.logger.info('Disabling blacklist authors')
+            self.upd.blacklist_authors = False
+
+    def blacklist_projects(self, item):
+        if item.active:
+            self.logger.info('Enabling blacklist projects')
+            config = ConfigParser.ConfigParser()
+            config.read(CONFIG_FILE)
+            if self.upd.acquire_blacklist_projects(config):
+                self.upd.blacklist_projects = True
+            else:
+                self.menu_blacklist_projects.set_active(False)
+        else:
+            self.logger.info('Disabling blacklist projects')
+            self.upd.blacklist_projects = False
 
     def show_github(self, item):
         self.logger.info('Opening GitHub website')
@@ -211,7 +236,8 @@ class GtkGui(object):
 
 class GithubFeedUpdatherThread(threading.Thread):
     def __init__(self, user, token, interval, max_items, hyperlinks, blog,
-                 important_authors, important_projects, filter_self):
+                 important_authors, important_projects, blacklist_authors,
+                 blacklist_projects):
         threading.Thread.__init__(self)
 
         self.logger = logging.getLogger('github-notifier')
@@ -228,49 +254,67 @@ class GithubFeedUpdatherThread(threading.Thread):
         self.interval = interval
         self.max_items = max_items
         self.hyperlinks = hyperlinks
+        self._seen = {}
         self.important_authors = important_authors
         self.important_projects = important_projects
-        self.filter_self = filter_self
-        self._seen = {}
-        self.authors = []
-        self.projects = []
-        self.oneself = []
+        self.blacklist_authors = blacklist_authors
+        self.blacklist_projects = blacklist_projects
+        self.list_important_authors = []
+        self.list_important_projects = []
+        self.list_blacklist_authors = []
+        self.list_blacklist_projects = []
 
-    def acquire_authors(self, config):
+    def acquire_important_authors(self, config):
         # Make list of important authors
         authors = config.get('important', 'authors')
-        self.authors = [author for author in authors.split(',') if author]
-        self.logger.info('Important Author: {}'.format(self.authors))
+        self.list_important_authors = [author for author in authors.split(',') if author]
+        self.logger.info('Important Author: {}'.format(self.list_important_authors))
 
         # Check to ensure authors were acquired
-        if not self.authors:
-            self.logger.warning('No important authors were found, ensure the'\
-                                ' config is correct. Disabling author filter')
-            self.important_authors = False
+        if not self.list_important_authors:
+            self.logger.warning('No important authors were found')
+            return False
+        else:
+            return True
 
-    def acquire_projects(self, config):
+    def acquire_important_projects(self, config):
         # Make list of important projects
         projects = config.get('important', 'projects')
-        self.projects = [project for project in projects.split(',') if project]
-        self.logger.info('Important Project: {}'.format(self.projects))
+        self.list_important_projects = [project for project in projects.split(',') if project]
+        self.logger.info('Important Project: {}'.format(self.list_important_projects))
 
         # Check to ensure projects were acquired
-        if not self.projects:
-            self.logger.warning('No important projects were found, ensure the'\
-                                ' config is correct. Disabling project filter')
-            self.important_projects = False
+        if not self.list_important_projects:
+            self.logger.warning('No important projects were found')
+            return False
+        else:
+            return True
 
-    def acquire_self(self, config):
-        # Acquire list of oneself
-        oneself = config.get('important', 'oneself')
-        self.oneself = [author for author in oneself.split(',') if author]
-        self.logger.info('Oneself: {}'.format(self.oneself))
+    def acquire_blacklist_authors(self, config):
+        # Make list of blacklist authors
+        authors = config.get('blacklist', 'authors')
+        self.list_blacklist_authors = [author for author in authors.split(',') if author]
+        self.logger.info('Blacklist Author: {}'.format(self.list_blacklist_authors))
 
-        # Check to ensure an author was acquired
-        if not self.oneself:
-            self.logger.warning('No authors were found for oneself, ensure the'\
-                                ' config is correct. Disabling oneself filter')
-            self.filter_self = False
+        # Check to ensure authors were acquired
+        if not self.list_blacklist_authors:
+            self.logger.warning('No blacklist authors were found, ensure the')
+            return False
+        else:
+            return True
+
+    def acquire_blacklist_projects(self, config):
+        # Make list of blacklist projects
+        projects = config.get('blacklist', 'projects')
+        self.list_blacklist_projects = [project for project in projects.split(',') if project]
+        self.logger.info('Blacklist Project: {}'.format(self.list_blacklist_projects))
+
+        # Check to ensure projects were acquired
+        if not self.list_blacklist_projects:
+            self.logger.warning('No blacklist projects were found, ensure the')
+            return False
+        else:
+            return True
 
     def run(self):
         while True:
@@ -304,6 +348,9 @@ class GithubFeedUpdatherThread(threading.Thread):
 
         users = {}
         l = []
+        found_author = False
+        found_project = False
+
         for item in notifications:
             if not item['author'] in users:
                 users[item['author']] = get_github_user_info(item['author'])
@@ -321,11 +368,6 @@ class GithubFeedUpdatherThread(threading.Thread):
                  'message': message,
                  'icon': user['avatar_path']}
 
-            # Check to see if entry is one's self
-            if self.filter_self and item['authors'][0]['name']  in self.oneself:
-              self.logger.info('Ignoring own entry')
-              continue
-
             # Check for GitHub Blog entry
             if item['author'] == GITHUB_BLOG_USER:
                 self.logger.info('Found GitHub Blog item entry')
@@ -333,7 +375,7 @@ class GithubFeedUpdatherThread(threading.Thread):
 
             # Check for important project entry
             if self.important_projects:
-                for project in self.projects:
+                for project in self.list_important_projects:
                     found_project = self.important_repository(item['link'],
                                                               project)
                     if found_project:
@@ -341,7 +383,7 @@ class GithubFeedUpdatherThread(threading.Thread):
 
             # Check for important author entry
             if self.important_authors:
-                found_author = item['authors'][0]['name'] in self.authors
+                found_author = item['authors'][0]['name'] in self.list_important_authors
 
             # Report and add only relevant entries
             if self.important_authors and found_author:
@@ -351,8 +393,29 @@ class GithubFeedUpdatherThread(threading.Thread):
                 self.logger.info('Found important project item entry')
                 l.append(n)
             elif not self.important_authors and not self.important_projects:
-                self.logger.info('Found item entry')
-                l.append(n)
+
+                ignore_author = False
+                ignore_project = False
+
+                # Check to see if entry is a blacklisted author
+                if self.blacklist_authors and item['authors'][0]['name'] in self.list_blacklist_authors:
+                  self.logger.info('Ignoring blacklisted author entry')
+                  ignore_author = True
+
+                # Check to see if entry is a blacklisted project
+                if self.blacklist_projects:
+                    for project in self.list_blacklist_projects:
+                        ignore_project = self.important_repository(item['link'],
+                                                                  project)
+                        if ignore_project:
+                            self.logger.info('Ignoring blacklisted project entry')
+                            break
+
+                if not ignore_author and not ignore_project:
+                    self.logger.info('Found item entry')
+                    l.append(n)
+            else:
+                self.logger.info('Ignoring non-important item entry')
 
         notification_queue.put(l)
 
@@ -419,9 +482,15 @@ def main():
     parser.add_option('-p', '--important_projects',
                       action='store_true', dest='important_projects', default=False,
                       help='only consider notifications from important projects')
-    parser.add_option('-s', '--filter_self',
-                      action='store_true', dest='filter_self', default=False,
-                      help='filter out entires that are made by oneself')
+    parser.add_option('-u', '--blacklist_authors',
+                      action='store_true', dest='blacklist_authors', default=False,
+                      help='filter out blacklisted authors')
+    parser.add_option('-r', '--blacklist_projects',
+                      action='store_true', dest='blacklist_projects', default=False,
+                      help='filter out blacklisted projects')
+    parser.add_option('-n', '--new-config',
+                      action='store_true', dest='new_config', default=False,
+                      help='create a new config.cfg at ~/.githubnotifier/')
     parser.add_option('-v', '--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='enable verbose logging')
@@ -453,12 +522,15 @@ def main():
         logger.warning('Making the cache directory {}'.format(CACHE_DIR))
         os.makedirs(CACHE_DIR)
 
-    if not os.path.isfile(CONFIG_FILE):
+    if not os.path.isfile(CONFIG_FILE) or options.new_config:
         logger.warning('Making the config file {}'.format(CONFIG_FILE))
         config_file = open(CONFIG_FILE, 'w')
         config_file.write('[important]  # Separated by commas, projects (can' \
                           ' be either <user>/<project> or <project>)\n')
-        config_file.write('authors=\nprojects=\noneself=')
+        config_file.write('authors=\nprojects=')
+        config_file.write('\n[blacklist]  # Separated by commas, projects (can' \
+                          ' be either <user>/<project> or <project>)\n')
+        config_file.write('authors=\nprojects=')
         config_file.close()
 
     if not pynotify.init('github-notifier'):
@@ -487,7 +559,8 @@ def main():
                                    options.max_items, hyperlinks, options.blog,
                                    options.important_authors,
                                    options.important_projects,
-                                   options.filter_self)
+                                   options.blacklist_authors,
+                                   options.blacklist_projects)
     upd.setDaemon(True)
     upd.start()
 

@@ -52,11 +52,14 @@ the `-p` flag. A *config.cfg* file is present within your *~/.githubnotifier/*
 directory. The file will be generated if it is not present at run-time.
 
 The *config.cfg* format is as follows:
-    
+
     [important]
     authors=bob,fred,mary
     projects=github-notifier,rails,bob/my-project
-    
+    [blacklist]
+    authors=james
+    projects=bad_project
+
 This configuration will only show notifications that have *bob*, *fred* or
 *mary* as the authors. The projects can either be in a general format (ex:
 *github-notifier* or *rails*) to only show notifications that deal with either
@@ -64,6 +67,13 @@ of those projects. The general format will show notifications that match the
 project name, regardless of who is the owner of the repository. The stricter
 format (ex: *bob/my-project*) will only show notifications of the *my-project*
 repository if the owner if *bob*.
+
+It is also possible to completely blacklist notifications from certain authors
+and/or projects. This is configured the same way as for *important* projects,
+but now the configuration falls under the *blacklist* category.
+
+Filters for important authors/projects will **override** filters for
+blacklisted authors/projects if they both are enabled.
 
 TODO
 ----

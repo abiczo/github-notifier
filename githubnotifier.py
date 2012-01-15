@@ -172,6 +172,7 @@ class GtkGui(object):
             items = self.upd.acquire_items(config, "important", "authors")
             if items:
                 self.upd.important_authors = True
+                self.upd.list_important_authors = items
             else:
                 self.menu_important_authors.set_active(False)
         else:
@@ -186,6 +187,7 @@ class GtkGui(object):
             items = self.upd.acquire_items(config, "important", "projects")
             if items:
                 self.upd.important_projects = True
+                self.upd.list_important_projects = items
             else:
                 self.menu_important_projects.set_active(False)
         else:
@@ -200,6 +202,7 @@ class GtkGui(object):
             items = self.upd.acquire_items(config, "blacklist", "authors")
             if items:
                 self.upd.blacklist_authors = True
+                self.upd.list_blacklist_authors = items
             else:
                 self.menu_blacklist_authors.set_active(False)
         else:
@@ -214,6 +217,7 @@ class GtkGui(object):
             items = self.upd.acquire_items(config, "blacklist", "projects")
             if items:
                 self.upd.blacklist_projects = True
+                self.upd.list_blacklist_projects = items
             else:
                 self.menu_blacklist_projects.set_active(False)
         else:

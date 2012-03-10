@@ -275,7 +275,8 @@ class GithubFeedUpdatherThread(threading.Thread):
     def acquire_items(self, config, category, items):
         config_items = config.get(category, items)
         aquired_items = [item for item in config_items.split(',') if item]
-        self.logger.info("Items in {} {}: {}".format(category, items, aquired_items))
+        self.logger.info(
+            "Items in {0} {1}: {2}".format(category, items, aquired_items))
         return aquired_items
 
     def run(self):
@@ -481,11 +482,11 @@ def main():
         sys.exit(1)
 
     if not os.path.isdir(CACHE_DIR):
-        logger.warning('Making the cache directory {}'.format(CACHE_DIR))
+        logger.warning('Making the cache directory {0}'.format(CACHE_DIR))
         os.makedirs(CACHE_DIR)
 
     if not os.path.isfile(CONFIG_FILE) or options.new_config:
-        logger.warning('Making the config file {}'.format(CONFIG_FILE))
+        logger.warning('Making the config file {0}'.format(CONFIG_FILE))
         config_file = open(CONFIG_FILE, 'w')
         config_file.write('[important]  # Separated by commas, projects (can' \
                           ' be either <user>/<project> or <project>)\n')

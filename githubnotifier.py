@@ -171,6 +171,8 @@ class GtkGui(object):
         menu_blacklist_organizations= gtk.CheckMenuItem('Exclude Blacklisted Organizations')
         menu_blacklist_organizations.connect('activate', self.blacklist_organizations)
         menu_blacklist_organizations.show()
+        if self.upd.blacklist_organizations:
+          menu_blacklist_organizations.set_active(True)
         self.menu.append(menu_blacklist_organizations)
 
 
@@ -346,13 +348,12 @@ class GithubFeedUpdatherThread(threading.Thread):
         self.list_blacklist_authors = []
         self.list_blacklist_projects = []
         self.list_blacklist_organizations = []
-
-        # Get and process all the organizations to show
-        if self.organizations:
-            list_organizations = get_github_user_organizations(user)    
+        self.users_organizations = get_github_user_organizations(user)
+      
+        list_organizations = self.users_organizations
         # Blacklist the organizations
         if self.organizations and self.blacklist_organizations:
-            list_organizations = filter(lambda x:x not in self.list_blacklist_organizations,list_organizations)
+            list_organizations = filter(lambda x:x not in self.list_blacklist_organizations,self.users_organizations)
 
         # Add all the organizations feeds to the feeds
         for organization in list_organizations:
@@ -372,6 +373,19 @@ class GithubFeedUpdatherThread(threading.Thread):
 
     def process_feed(self, feed_url):
         self.logger.info('Fetching feed %s' % feed_url)
+
+
+        ####### This is necessary to allow real-time changes
+        # Don't allow fetch organizations when is disabled
+        if not self.organizations and feed_url.find("organizations") >= 0:
+            return []
+            
+        # Don't allow fetching blacklisted organizations
+        if self.organizations and self.blacklist_organizations:
+            for organization in self.list_blacklist_organizations:
+                if feed_url.find("organizations/%s" % organization) >= 0:
+                    return [] 
+        ####
         feed = feedparser.parse(feed_url)
 
         notifications = []

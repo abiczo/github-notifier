@@ -54,8 +54,9 @@ feature to blacklist some organizations.
 ### Filtering Feature
 
 Authors are filtered when using the `-a` flag. Projects are filtered when using
-the `-p` flag. A *config.cfg* file is present within your *~/.githubnotifier/*
-directory. The file will be generated if it is not present at run-time.
+the `-p` flag. `-k` to blacklist organizations. A *config.cfg* file is present 
+within your *~/.githubnotifier/* directory. The file will be generated if it is 
+not present at run-time.
 
 The *config.cfg* format is as follows:
 

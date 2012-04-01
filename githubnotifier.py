@@ -350,6 +350,7 @@ class GithubFeedUpdatherThread(threading.Thread):
         # Get and process all the organizations to show
         if self.organizations:
             list_organizations = get_github_user_organizations(user)    
+        # Blacklist the organizations
         if self.organizations and self.blacklist_organizations:
             list_organizations = filter(lambda x:x not in self.list_blacklist_organizations,list_organizations)
 

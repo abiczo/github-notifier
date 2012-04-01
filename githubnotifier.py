@@ -95,6 +95,35 @@ def get_github_user_info(username):
 
     return user
 
+def get_github_user_organizations(user):
+    organizations_cache = os.path.abspath(os.path.join(CACHE_DIR, user + '_orgs.json'))
+    if not os.path.exists(organizations_cache):
+        try:
+            # Fetch userinfo from github
+            url = 'https://api.github.com/users/' + user + '/orgs'
+            resp = urllib2.urlopen(url).read()
+            obj = json.loads(resp)
+            organizations = obj
+
+            # Cache the userinfo
+            fp = open(organizations_cache, 'w')
+            fp.write(json.dumps(organizations))
+            fp.close()
+        except (urllib2.URLError, httplib.HTTPException):
+            # Create a 'fake' user object in case of network errors
+            organizations = []
+
+    else:
+        # Use cached userinfo
+        fp = open(organizations_cache, 'r')
+        info = fp.read()
+        organizations = json.loads(info)
+
+    # Get all organizations and return the logins of the organizations in an array
+    orgs = []
+    for item in organizations:
+         orgs.append(item['login'])
+    return orgs
 
 class GtkGui(object):
     def __init__(self, upd):
@@ -110,6 +139,13 @@ class GtkGui(object):
         menu_github.connect('activate', self.show_github)
         menu_github.show()
         self.menu.append(menu_github)
+
+        menu_organizations = gtk.CheckMenuItem('Feeds organizations')
+        menu_organizations.connect('activate', self.organizations)
+        menu_organizations.show()
+        if self.upd.organizations:
+          menu_organizations.set_active(True)
+        self.menu.append(menu_organizations)
 
         menu_important_authors = gtk.CheckMenuItem('Only Important Authors')
         menu_important_authors.connect('activate', self.important_authors)
@@ -131,6 +167,13 @@ class GtkGui(object):
         menu_blacklist_projects.show()
         self.menu.append(menu_blacklist_projects)
 
+    
+        menu_blacklist_organizations= gtk.CheckMenuItem('Exclude Blacklisted Organizations')
+        menu_blacklist_organizations.connect('activate', self.blacklist_organizations)
+        menu_blacklist_organizations.show()
+        self.menu.append(menu_blacklist_organizations)
+
+
         menu_about = gtk.ImageMenuItem(gtk.STOCK_ABOUT)
         menu_about.connect('activate', self.show_about)
         menu_about.show()
@@ -146,6 +189,10 @@ class GtkGui(object):
         self.menu_important_projects = menu_important_projects
         self.menu_blacklist_authors = menu_blacklist_authors
         self.menu_blacklist_projects = menu_blacklist_projects
+        self.menu_organizations = menu_organizations
+        self.menu_blacklist_organizations= menu_blacklist_organizations
+
+
 
         self.systray_icon.connect('popup_menu', self.show_menu)
 
@@ -224,6 +271,30 @@ class GtkGui(object):
             self.logger.info('Disabling blacklist projects')
             self.upd.blacklist_projects = False
 
+    def organizations(self, item):
+        if item.active:
+            self.logger.info('Enabling feeds organizations')
+            self.upd.organizations = True
+        else:
+            self.logger.info('Disabling feeds organizations')
+            self.upd.organizations = False
+
+
+    def blacklist_organizations(self, item):
+        if item.active:
+            self.logger.info('Enabling blacklist organizations')
+            config = ConfigParser.ConfigParser()
+            config.read(CONFIG_FILE)
+            items = self.upd.acquire_items(config, "blacklist", "organizations")
+            if items:
+                self.upd.blacklist_organizations = True
+                self.upd.list_blacklist_organizations= items
+            else:
+                self.menu_blacklist_organizations.set_active(False)
+        else:
+            self.logger.info('Disabling blacklist projects')
+            self.upd.blacklist_organizations= False
+
     def show_github(self, item):
         self.logger.info('Opening GitHub website')
         webbrowser.open(GITHUB_URL)
@@ -233,7 +304,7 @@ class GtkGui(object):
         dlg = gtk.AboutDialog()
         dlg.set_name('GitHub Notifier')
         dlg.set_version(__version__)
-        dlg.set_authors(['Andras Biczo <abiczo@gmail.com>'])
+        dlg.set_authors(['Andras Biczo <abiczo@gmail.com>','Hermes Ojeda Ruiz <hermes.ojeda@logicalbricks.com> Organizations feature'])
         dlg.set_copyright('Copyright %s 2009 Andras Biczo' % unichr(169).encode('utf-8'))
         gtk.about_dialog_set_url_hook(lambda widget, link: webbrowser.open(link))
         dlg.set_website('http://github.com/abiczo/github-notifier')
@@ -245,7 +316,7 @@ class GtkGui(object):
 class GithubFeedUpdatherThread(threading.Thread):
     def __init__(self, user, token, interval, max_items, hyperlinks, blog,
                  important_authors, important_projects, blacklist_authors,
-                 blacklist_projects):
+                 blacklist_projects, organizations, blacklist_organizations):
         threading.Thread.__init__(self)
 
         self.logger = logging.getLogger('github-notifier')
@@ -255,6 +326,7 @@ class GithubFeedUpdatherThread(threading.Thread):
             'http://github.com/%s.private.actor.atom?token=%s' % (user, token),
         ]
 
+                
         if blog:
             self.logger.info('Observing the GitHub Blog')
             self.feeds.append(GITHUB_BLOG_URL)
@@ -267,10 +339,23 @@ class GithubFeedUpdatherThread(threading.Thread):
         self.important_projects = important_projects
         self.blacklist_authors = blacklist_authors
         self.blacklist_projects = blacklist_projects
+        self.organizations = organizations
+        self.blacklist_organizations = blacklist_organizations
         self.list_important_authors = []
         self.list_important_projects = []
         self.list_blacklist_authors = []
         self.list_blacklist_projects = []
+        self.list_blacklist_organizations = []
+
+        # Get and process all the organizations to show
+        if self.organizations:
+            list_organizations = get_github_user_organizations(user)    
+        if self.organizations and self.blacklist_organizations:
+            list_organizations = filter(lambda x:x not in self.list_blacklist_organizations,list_organizations)
+
+        # Add all the organizations feeds to the feeds
+        for organization in list_organizations:
+            self.feeds.append('https://github.com/organizations/%s/%s.private.atom?token=%s' % (organization, user, token))
 
     def acquire_items(self, config, category, items):
         config_items = config.get(category, items)
@@ -442,6 +527,12 @@ def main():
     parser.add_option('-a', '--important_authors',
                       action='store_true', dest='important_authors', default=False,
                       help='only consider notifications from important authors')
+    parser.add_option('-o', '--organizations',
+                      action='store_true', dest='organizations', default=True,
+                      help='consider notifications of all user\'s organizations')
+    parser.add_option('-k', '--blacklist_organizations',
+                      action='store_true', dest='blacklist_organizations', default=False,
+                      help='filter out blacklisted user\'s organizations')
     parser.add_option('-p', '--important_projects',
                       action='store_true', dest='important_projects', default=False,
                       help='only consider notifications from important projects')
@@ -494,6 +585,7 @@ def main():
         config_file.write('\n[blacklist]  # Separated by commas, projects (can' \
                           ' be either <user>/<project> or <project>)\n')
         config_file.write('authors=\nprojects=')
+        config_file.write('\norganizations=')
         config_file.close()
 
     if not pynotify.init('github-notifier'):
@@ -523,7 +615,9 @@ def main():
                                    options.important_authors,
                                    options.important_projects,
                                    options.blacklist_authors,
-                                   options.blacklist_projects)
+                                   options.blacklist_projects,
+                                   options.organizations,
+                                   options.blacklist_organizations)
     upd.setDaemon(True)
     upd.start()
 

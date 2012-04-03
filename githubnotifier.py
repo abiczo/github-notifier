@@ -530,7 +530,7 @@ def main():
                       action='store_false', default=True,
                       help='don\'t show the systray icon')
     parser.add_option('-i', '--update-interval',
-                      action='store', type='int', dest='interval', default=10,
+                      action='store', type='int', dest='interval', default=300,
                       help='set the feed update interval (in seconds)')
     parser.add_option('-m', '--max-items',
                       action='store', type='int', dest='max_items', default=3,

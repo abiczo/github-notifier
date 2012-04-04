@@ -307,7 +307,7 @@ class GtkGui(object):
         dlg.set_version(__version__)
         dlg.set_authors(['Andras Biczo <abiczo@gmail.com>',
                          'Hermes Ojeda Ruiz <hermes.ojeda@logicalbricks.com>'])
-        dlg.set_copyright('Copyright %s 2009 Andras Biczo' % i
+        dlg.set_copyright('Copyright %s 2009 Andras Biczo' % 
                           unichr(169).encode('utf-8'))
         gtk.about_dialog_set_url_hook(lambda widget, 
                                              link: webbrowser.open(link))
@@ -384,7 +384,7 @@ class GithubFeedUpdatherThread(threading.Thread):
             return []
             
         # Don't allow fetching blacklisted organizations 
-        if any(feed_url.find("organizations/%s" % org) i
+        if any(feed_url.find("organizations/%s" % org) 
                   >= 0 for org in self.list_blacklist_organizations):
             return []
 

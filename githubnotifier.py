@@ -54,10 +54,10 @@ def get_github_user_info(username):
     if not os.path.exists(info_cache):
         try:
             # Fetch userinfo from github
-            url = 'http://github.com/api/v1/json/' + username
+            url = 'https://api.github.com/users/' + username
             resp = urllib2.urlopen(url).read()
             obj = json.loads(resp)
-            user = obj['user']
+            user = obj
 
             # Cache the userinfo
             fp = open(info_cache, 'w')
@@ -74,17 +74,15 @@ def get_github_user_info(username):
         user = json.loads(info)
 
     user['avatar_path'] = os.path.abspath(os.path.join(CACHE_DIR,
-                                                       username + '.jpg'))
+                                                       username))
     if not os.path.exists(user['avatar_path']):
         # Fetch the user's gravatar
-        if 'email' in user:
-            hexdig = hashlib.md5(user['email'].lower()).hexdigest()
-            gravatar_url = 'http://www.gravatar.com/avatar/%s.jpg?s=48' % hexdig
+        if 'avatar_url' in user:
+            gravatar_url = user['avatar_url']
         else:
             gravatar_url = 'http://www.gravatar.com/avatar/?s=48'
-
         try:
-            avatar_data = urllib2.urlopen(gravatar_url).read()
+            avatar_data = urllib2.urlopen(user['avatar_url']).read()
 
             # Cache the image
             fp = open(user['avatar_path'], 'wb')

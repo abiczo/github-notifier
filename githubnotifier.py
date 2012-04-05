@@ -66,7 +66,8 @@ def get_github_user_info(username):
         except (urllib2.URLError, httplib.HTTPException):
             # Create a 'fake' user object in case of network errors
             user = {'login': username}
-
+   
+        
     else:
         # Use cached userinfo
         fp = open(info_cache, 'r')
@@ -82,7 +83,7 @@ def get_github_user_info(username):
         else:
             gravatar_url = 'http://www.gravatar.com/avatar/?s=48'
         try:
-            avatar_data = urllib2.urlopen(user['avatar_url']).read()
+            avatar_data = urllib2.urlopen(gravatar_url).read()
 
             # Cache the image
             fp = open(user['avatar_path'], 'wb')

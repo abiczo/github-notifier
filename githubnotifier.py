@@ -417,7 +417,8 @@ class GithubFeedUpdatherThread(threading.Thread):
 
         for item in notifications:
             if not item['author'] in users:
-                users[item['author']] = get_github_user_info(item['author'])
+                users[item['author']] = get_github_user_info(
+                                            item['author'].split(" ")[0])
 
             user = users[item['author']]
             if self.hyperlinks and 'link' in item:

@@ -619,7 +619,14 @@ def main():
 
     (user, token) = get_github_config()
     if not user or not token:
-        logger.error('Could not get GitHub username and token from git config')
+        logger.error(
+            '''Could not get GitHub username and token from git config
+            you can run 
+               $git config --global github.user <username>
+            and
+               $git config --global github.token <token>
+            to configure it.\n
+            for more information about token check the link https://help.github.com/articles/creating-an-access-token-for-command-line-use''')
         sys.exit(1)
 
     if options.systray_icon:

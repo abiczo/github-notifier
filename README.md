@@ -20,7 +20,7 @@ Install
 
 First install the package dependencies (using Ubuntu)
 
-    sudo apt-get install python-setuptools python-gtk2 python-feedparser python-simplejson
+    sudo apt-get install python-setuptools python-gtk2 python-feedparser python-simplejson python-notify
 
 Then clone the repository and install the module:
 

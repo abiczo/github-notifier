@@ -36,6 +36,33 @@ GITHUB_URL = 'https://github.com/'
 
 notification_queue = Queue.Queue()
 
+http_error_codes = {
+    301: "Moved Permanently",
+    400: "Bad Request",
+    401: "Unauthorized",
+    402  "Payment Required",
+    403: "Forbidden",
+    404: "Not Found"
+    405: "Method Not Allowed",
+    406: "Not Acceptable",
+    407: "Proxy Authentication Required",
+    408: "Request Timeout",
+    410: "Gone",
+    411: "Length Required",
+    413: "Payload Too Larg",
+    414: "URI Too Long",
+    415: "Unsupported Media Type",
+    416: "Range Not Satisfiable",
+    417: "Expectation Failed",
+    423: "Locked",
+    500: "Internal Server Error",
+    501: "Not Implemented",
+    502: "Bad Gateway",
+    503: "Service Unavailable",
+    504: "Gateway Timeout",
+    505: "HTTP Version Not Supporte"
+}
+
 
 def get_github_config():
     fp = os.popen('git config --get github.user')
@@ -388,6 +415,10 @@ class GithubFeedUpdatherThread(threading.Thread):
             return []
 
         feed = feedparser.parse(feed_url)
+        if http_error_codes.get(feed.status):
+            self.logger.error('Feed answered with %s %s' % (http_error_codes.get(feed.status), feed.status))
+        else:
+            self.logger.info('Feed answered with %s ' % feed.status)
 
         notifications = []
         for entry in feed.entries:

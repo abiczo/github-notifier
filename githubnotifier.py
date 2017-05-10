@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import socket
@@ -325,8 +326,8 @@ class GithubFeedUpdatherThread(threading.Thread):
         self.logger = logging.getLogger('github-notifier')
 
         self.feeds = [
-            'http://github.com/%s.private.atom?token=%s' % (user, token),
-            'http://github.com/%s.private.actor.atom?token=%s' % (user, token),
+            'https://github.com/%s.private.atom?token=%s' % (user, token),
+            'https://github.com/%s.private.actor.atom?token=%s' % (user, token),
         ]
 
         if blog:
@@ -389,6 +390,13 @@ class GithubFeedUpdatherThread(threading.Thread):
 
         feed = feedparser.parse(feed_url)
 
+        if self.is_problematic_http_code( str(feed.status) ):
+            message = 'Feed answered with %s - %s%sFor URL: %s' % \
+                      (feed.status, httplib.responses.get(feed.status), os.linesep, feed.href)
+            self.logger.error(message)
+        else:
+            self.logger.info('Feed answered with %s' % feed.status)
+
         notifications = []
         for entry in feed.entries:
             if not entry['id'] in self._seen:
@@ -400,6 +408,9 @@ class GithubFeedUpdatherThread(threading.Thread):
                 self._seen[entry['id']] = 1
 
         return notifications
+
+    def is_problematic_http_code(self, code):
+        return re.match("(301|4\d\d|5\d\d)", code)
 
     def update_feeds(self, feeds):
         notifications = []

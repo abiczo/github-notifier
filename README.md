@@ -11,6 +11,7 @@ the notifications if desired.
 Requirements
 ------------
 
+* git
 * python 2.5, 2.6 or 2.7
 * feedparser
 * simplejson (not needed for python 2.6)
@@ -31,6 +32,11 @@ Then clone the repository and install the module:
 Now you can run github-notifier like this:
 
     github-notifier
+
+`github-notifier` will read the `github.token` from your git config.
+Make sure that it matches the token found on at the bottom of your
+[github main page](https://github.com/), _Subscribe to **your** news feed_ link.
+You can see your config via `git config -l` and `git config --get github.token`.
 
 Use `--help` for a list of available command line options.
 
@@ -54,8 +60,8 @@ feature to blacklist some organizations.
 ### Filtering Feature
 
 Authors are filtered when using the `-a` flag. Projects are filtered when using
-the `-p` flag. `-k` to blacklist organizations. A *config.cfg* file is present 
-within your *~/.githubnotifier/* directory. The file will be generated if it is 
+the `-p` flag. `-k` to blacklist organizations. A *config.cfg* file is present
+within your *~/.githubnotifier/* directory. The file will be generated if it is
 not present at run-time.
 
 The *config.cfg* format is as follows:
@@ -74,11 +80,11 @@ This configuration will only show notifications that have *bob*, *fred* or
 of those projects. The general format will show notifications that match the
 project name, regardless of who is the owner of the repository. The stricter
 format (ex: *bob/my-project*) will only show notifications of the *my-project*
-repository if the owner if *bob*. 
+repository if the owner if *bob*.
 
 It is also possible to completely blacklist notifications from certain authors
 and/or projects. This is configured the same way as for *important* projects,
-but now the configuration falls under the *blacklist* category, the organizations 
+but now the configuration falls under the *blacklist* category, the organizations
 can be filtered using the login (ex: *LogicalBricks,Github*), comma separated.
 
 

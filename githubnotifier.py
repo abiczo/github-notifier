@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import socket
@@ -35,33 +36,6 @@ GITHUB_BLOG_USER = 'GitHub Blog'
 GITHUB_URL = 'https://github.com/'
 
 notification_queue = Queue.Queue()
-
-http_error_codes = {
-    301: "Moved Permanently",
-    400: "Bad Request",
-    401: "Unauthorized",
-    402  "Payment Required",
-    403: "Forbidden",
-    404: "Not Found"
-    405: "Method Not Allowed",
-    406: "Not Acceptable",
-    407: "Proxy Authentication Required",
-    408: "Request Timeout",
-    410: "Gone",
-    411: "Length Required",
-    413: "Payload Too Larg",
-    414: "URI Too Long",
-    415: "Unsupported Media Type",
-    416: "Range Not Satisfiable",
-    417: "Expectation Failed",
-    423: "Locked",
-    500: "Internal Server Error",
-    501: "Not Implemented",
-    502: "Bad Gateway",
-    503: "Service Unavailable",
-    504: "Gateway Timeout",
-    505: "HTTP Version Not Supporte"
-}
 
 
 def get_github_config():
@@ -415,10 +389,11 @@ class GithubFeedUpdatherThread(threading.Thread):
             return []
 
         feed = feedparser.parse(feed_url)
-        if http_error_codes.get(feed.status):
-            self.logger.error('Feed answered with %s %s' % (http_error_codes.get(feed.status), feed.status))
+
+        if self.is_problematic_http_code( str(feed.status) ):
+            self.logger.error('Feed answered with %s - %s' % (feed.status, httplib.responses.get(feed.status)))
         else:
-            self.logger.info('Feed answered with %s ' % feed.status)
+            self.logger.info('Feed answered with %s' % feed.status)
 
         notifications = []
         for entry in feed.entries:
@@ -431,6 +406,9 @@ class GithubFeedUpdatherThread(threading.Thread):
                 self._seen[entry['id']] = 1
 
         return notifications
+
+    def is_problematic_http_code(self, code):
+        return re.match("(301|4\d\d|5\d\d)", code)
 
     def update_feeds(self, feeds):
         notifications = []

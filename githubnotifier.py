@@ -390,12 +390,12 @@ class GithubFeedUpdatherThread(threading.Thread):
 
         feed = feedparser.parse(feed_url)
 
-        if self.is_problematic_http_code( str(feed.status) ):
+        if hasattr(feed, 'status') and self.is_problematic_http_code( str(feed.status) ):
             message = 'Feed answered with %s - %s%sFor URL: %s' % \
-                      (feed.status, httplib.responses.get(feed.status), os.linesep, feed.href)
+                    (feed.status, httplib.responses.get(feed.status), os.linesep, feed.href)
             self.logger.error(message)
-        else:
-            self.logger.info('Feed answered with %s' % feed.status)
+        elif hasattr(feed, 'status'):
+            self.logger.info('Feed answered with %s - %s' % (feed.status, httplib.responses.get(feed.status)))
 
         notifications = []
         for entry in feed.entries:
@@ -580,13 +580,18 @@ def main():
     parser.add_option('-v', '--verbose',
                       action='store_true', dest='verbose', default=False,
                       help='enable verbose logging')
+    parser.add_option('-d', '--debug',
+                      action='store_true', dest='debug', default=False,
+                      help='enable debug logging')
     (options, args) = parser.parse_args()
 
     # Create logger
     logger = logging.getLogger('github-notifier')
     handler = logging.StreamHandler()
 
-    if options.verbose:
+    if options.debug:
+        logger.setLevel(logging.DEBUG)
+    elif options.verbose:
         logger.setLevel(logging.INFO)
     else:
         logger.setLevel(logging.WARNING)
